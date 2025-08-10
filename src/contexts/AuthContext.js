@@ -205,7 +205,7 @@ export function AuthProvider({ children }) {
         payload: { progress: 30, message: 'Connecting to Odoo server...' } 
       });
 
-      const response = await fetch('http://localhost:8000/api/odoo/connect', {
+      const response = await fetch('/api/odoo/connect', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -258,7 +258,7 @@ export function AuthProvider({ children }) {
     try {
       // Call backend to disconnect
       if (state.connectionId) {
-        await fetch('http://localhost:8000/api/odoo/disconnect', {
+        await fetch('/api/odoo/disconnect', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -288,7 +288,7 @@ export function AuthProvider({ children }) {
         payload: { progress: 30, message: 'Refreshing invoice data...' } 
       });
 
-      const response = await fetch('http://localhost:8000/api/odoo/refresh', {
+      const response = await fetch('/api/odoo/refresh', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

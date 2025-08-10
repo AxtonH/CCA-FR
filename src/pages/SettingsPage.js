@@ -1170,7 +1170,7 @@ END OF REPORT
                       size="sm"
                       onClick={async () => {
                         try {
-                          const response = await fetch('http://localhost:8000/api/email/test', {
+      const response = await fetch('/api/email/test', {
                             method: 'POST',
                             headers: {
                               'Content-Type': 'application/json',

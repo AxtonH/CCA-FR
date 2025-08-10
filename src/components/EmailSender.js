@@ -461,7 +461,7 @@ Thank you for your cooperation.`
       });
       
       // Call the backend API to send emails
-      const response = await fetch('http://localhost:8000/api/email/send', {
+      const response = await fetch('/api/email/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
