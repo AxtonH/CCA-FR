@@ -1,0 +1,22 @@
+{
+  "automated_reports": {
+    "enabled": true,
+    "recipient_email": "omarbasemelhasan@gmail.com",
+    "report_time": "23:00",
+    "check_interval": "hourly",
+    "email_template": "daily_summary",
+    "last_sent": null,
+    "odoo_connection": {
+      "database": "prezlab-staging-22061821",
+      "password": "Omar@@1998",
+      "url": "https://prezlab-staging-22061821.dev.odoo.com",
+      "username": "omar.elhasan@prezlab.com"
+    },
+    "email_settings": {
+      "sender_email": "omarbasemelhasan@gmail.com",
+      "sender_password": "zslz yakq zrjt vyxt",
+      "smtp_port": 587,
+      "smtp_server": "smtp.gmail.com"
+    }
+  }
+}
