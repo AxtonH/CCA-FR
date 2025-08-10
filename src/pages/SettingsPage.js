@@ -119,8 +119,8 @@ const SettingsPage = () => {
     email_settings: {
       smtp_server: 'smtp.gmail.com',
       smtp_port: 587,
-      sender_email: 'omar.elhasan@prezlab.com',
-      sender_password: 'cnns amsx gxxj ixnm'
+      sender_email: 'omarbasemelhasan@gmail.com',
+      sender_password: 'zslz yakq zrjt vyxt'
     }
   });
   const [showAutomatedReportsForm, setShowAutomatedReportsForm] = useState(false);
