@@ -4,11 +4,19 @@ Email Templates for Odoo Invoice Follow-Up Manager
 This file contains all email templates used in the application.
 """
 
+DISCLAIMER_TEXT = "Please dismiss this email if you have already made the payment."
+
+def _ensure_disclaimer(body: str) -> str:
+    try:
+        if DISCLAIMER_TEXT.lower() not in body.lower():
+            body = body.rstrip() + "\n\n" + DISCLAIMER_TEXT
+    except Exception:
+        pass
+    return body
+
 def get_initial_reminder_template():
     """Get the initial reminder email template"""
-    return {
-        "subject": "Invoice notice - outstanding balance of [Amount] [Currency]",
-        "body": """Dear [Company Name],
+    body = """Dear [Company Name],
 
 I hope this message finds you well.
 
@@ -25,13 +33,14 @@ Should you have any questions or require assistance, our CS department is availa
 Thank you for your cooperation.
 
 Sincerely,"""
+    return {
+        "subject": "Invoice notice - outstanding balance of [Amount] [Currency]",
+        "body": _ensure_disclaimer(body)
     }
 
 def get_second_reminder_template():
     """Get the second reminder email template"""
-    return {
-        "subject": "Invoice notice - outstanding balance of [Amount] [Currency]",
-        "body": """Dear [Company Name],
+    body = """Dear [Company Name],
 
 I hope you're doing well.
 
@@ -44,13 +53,14 @@ If you have already processed the payment, please disregard this reminder. Other
 [TABLE]
 
 We appreciate your prompt attention to this issue."""
+    return {
+        "subject": "Invoice notice - outstanding balance of [Amount] [Currency]",
+        "body": _ensure_disclaimer(body)
     }
 
 def get_final_reminder_template():
     """Get the final reminder email template"""
-    return {
-        "subject": "Invoice notice - outstanding balance of [Amount] [Currency]",
-        "body": """Dear [Company Name],
+    body = """Dear [Company Name],
 
 This is our final reminder regarding the outstanding balance of [Amount] [Currency] on your account, which has now been overdue for [Number of Days] days.
 
@@ -65,6 +75,9 @@ If payment has been made, please provide confirmation at your earliest convenien
 Thank you for your immediate attention.
 
 Sincerely,"""
+    return {
+        "subject": "Invoice notice - outstanding balance of [Amount] [Currency]",
+        "body": _ensure_disclaimer(body)
     }
 
 def get_template_by_type(template_type):

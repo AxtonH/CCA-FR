@@ -289,7 +289,9 @@ If you have already processed the payment, please disregard this reminder. Other
 
 ${invoiceTable}
 
-We appreciate your prompt attention to this issue.`
+We appreciate your prompt attention to this issue.
+
+please dismiss this email if you have already made the payment`
         };
         break;
       case 'final':
@@ -313,7 +315,9 @@ If payment has been made, please provide confirmation at your earliest convenien
 
 ${invoiceTable}
 
-Thank you for your immediate attention.`
+Thank you for your immediate attention.
+
+please dismiss this email if you have already made the payment`
         };
         break;
       default: // initial
@@ -339,7 +343,9 @@ Should you have any questions or require assistance, our CS department is availa
 
 ${invoiceTable}
 
-Thank you for your cooperation.`
+Thank you for your cooperation.
+
+please dismiss this email if you have already made the payment`
         };
         break;
     }

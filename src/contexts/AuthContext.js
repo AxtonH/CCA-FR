@@ -13,15 +13,15 @@ const initialState = {
   loadingMessage: '',
   error: null,
   // Add settings state
-  settings: {
-    emailConfig: {
-      senderEmail: 'omar.elhasan@prezlab.com',
-      senderPassword: 'cnns amsx gxxj ixnm',
-      ccList: '',
-      smtpServer: 'smtp.gmail.com',
-      smtpPort: '587',
-      defaultSenderName: '',
-    },
+      settings: {
+      emailConfig: {
+        senderEmail: process.env.REACT_APP_DEFAULT_SENDER_EMAIL || '',
+        senderPassword: process.env.REACT_APP_DEFAULT_SENDER_PASSWORD || '',
+        ccList: '',
+        smtpServer: process.env.REACT_APP_DEFAULT_SMTP_SERVER || 'smtp.gmail.com',
+        smtpPort: process.env.REACT_APP_DEFAULT_SMTP_PORT || '587',
+        defaultSenderName: '',
+      },
     currency: 'ORIGINAL',
     security: {
       sessionTimeout: 60,
@@ -219,7 +219,16 @@ export function AuthProvider({ children }) {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to connect to Odoo');
+        let message = 'Failed to connect to Odoo';
+        try {
+          const err = await response.json();
+          if (err && err.error) {
+            message = err.error;
+          } else if (response.status === 401) {
+            message = 'Invalid credentials or unable to authenticate with Odoo.';
+          }
+        } catch (_) {}
+        throw new Error(message);
       }
 
       dispatch({ 

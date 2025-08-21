@@ -141,6 +141,7 @@ class OdooConnector:
         self.database = database
         self.username = username
         self.password = password
+        self.last_error = None
         
         # Optimized session with connection pooling
         from requests.adapters import HTTPAdapter
@@ -193,6 +194,9 @@ class OdooConnector:
             }
             
             response = self.session.post(auth_url, json=auth_data)
+            if not response.ok:
+                self.last_error = f"HTTP {response.status_code} while contacting Odoo"
+                return False
             result = response.json()
             
             if result.get('result') and result['result'].get('uid'):
@@ -209,10 +213,19 @@ class OdooConnector:
                 
                 return True
             else:
+                # Try to extract a meaningful error message
+                if result.get('error'):
+                    # Typical Odoo JSON-RPC error structure
+                    data = result['error'].get('data', {})
+                    message = data.get('message') or result['error'].get('message') or 'Authentication failed'
+                    self.last_error = message
+                else:
+                    self.last_error = 'Invalid credentials or database selection'
                 return False
                 
         except Exception as e:
             print(f"Connection error: {str(e)}")
+            self.last_error = str(e)
             return False
     
     def get_overdue_invoices(self, progress_callback=None):
@@ -877,7 +890,8 @@ def generate_email_template(client_name, invoices, days_overdue, template_type="
     
     # Use consistent subject line for all template types to enable proper threading
     subject = f"Invoice notice - outstanding balance of ${total_amount:,.2f}"
-    
+    disclaimer = "please dismiss this email if you have already made the payment"
+
     if template_type == "initial":
         body = f"""
 Dear {client_name},
@@ -930,6 +944,10 @@ Best regards,
 Your Company Name
         """
     
+    # Ensure disclaimer is present
+    if disclaimer not in body.lower():
+        body = body.strip() + "\n\n" + disclaimer
+    
     return {
         'subject': subject.strip(),
         'body': body.strip()
@@ -947,7 +965,9 @@ def send_email(sender_email, sender_password, recipient_email, cc_list, subject,
         print(f"   Threading enabled: {enable_threading}")
         
         # Check if body contains HTML tags to determine format
-        is_html = '<table>' in body or '<tr>' in body or '<td>' in body or '<th>' in body
+        is_html = ('<table>' in body or '<tr>' in body or '<td>' in body or '<th>' in body or 
+                  '<html>' in body or '<div>' in body or '<p>' in body or '<span>' in body or 
+                  '<head>' in body or '<body>' in body or 'DOCTYPE html' in body)
         print(f"   Content type: {'HTML' if is_html else 'Plain text'}")
         
         # Get thread ID if threading is enabled and client info is provided
@@ -967,8 +987,6 @@ def send_email(sender_email, sender_password, recipient_email, cc_list, subject,
         
         if is_html:
             # Create a multipart alternative message for better HTML support
-            from email.mime.multipart import MIMEMultipart
-            from email.mime.text import MIMEText
             
             # Create plain text version (strip HTML tags)
             import re

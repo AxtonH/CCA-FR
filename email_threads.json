@@ -5,7 +5,7 @@
     "client_email": "omar.elhasan@prezlab.com",
     "company_name": "Prezlab FZ LLC",
     "created_date": "2025-08-07T12:49:39.007621",
-    "message_count": 7,
+    "message_count": 9,
     "last_subject": "Invoice notice - outstanding balance of د.إ886,864.09"
   },
   "Prezlab Digital Design Firm L.L.C. - O.P.C_omarbasemelhasan@gmail.com_Prezlab FZ LLC": {
@@ -16,5 +16,41 @@
     "created_date": "2025-08-07T13:16:05.532011",
     "message_count": 1,
     "last_subject": "Second Reminder – Outstanding Balance of د.إ886,864.09"
+  },
+  "Finance Team_omarbasemelhasan@gmail.com_Daily Reports": {
+    "thread_id": "<b0a3e4095ee30936c3d6dc0767b8c2dd@DailyReports.com>",
+    "client_name": "Finance Team",
+    "client_email": "omarbasemelhasan@gmail.com",
+    "company_name": "Daily Reports",
+    "created_date": "2025-08-11T10:59:29.231853",
+    "message_count": 3,
+    "last_subject": "Daily Invoice Follow-Up Report - 2025-08-11"
+  },
+  "Sanad_sanad.zaqtan@prezlab.com_Daily Reports": {
+    "thread_id": "<d7b62f20a46848ad815cb6e33d652656@DailyReports.com>",
+    "client_name": "Sanad",
+    "client_email": "sanad.zaqtan@prezlab.com",
+    "company_name": "Daily Reports",
+    "created_date": "2025-08-20T14:12:26.010215",
+    "message_count": 0,
+    "last_subject": "Daily Invoice Follow-Up Report - 2025-08-20"
+  },
+  "Omar_omar.elhasan@prezlab.com_Daily Reports": {
+    "thread_id": "<2867bc687bda9b3f8bdb309654ffa9e3@DailyReports.com>",
+    "client_name": "Omar",
+    "client_email": "omar.elhasan@prezlab.com",
+    "company_name": "Daily Reports",
+    "created_date": "2025-08-20T14:12:28.704142",
+    "message_count": 7,
+    "last_subject": "Daily Invoice Follow-Up Report - 2025-08-21"
+  },
+  "omar_omarbasemelhasan@gmail.com_Daily Reports": {
+    "thread_id": "<e2ba22a07c406129330d01c55f68885d@DailyReports.com>",
+    "client_name": "omar",
+    "client_email": "omarbasemelhasan@gmail.com",
+    "company_name": "Daily Reports",
+    "created_date": "2025-08-21T15:08:56.013549",
+    "message_count": 2,
+    "last_subject": "Daily Invoice Follow-Up Report - 2025-08-21"
   }
 }

@@ -35,7 +35,9 @@ class ConfigManager:
         default_config = {
             "automated_reports": {
                 "enabled": False,
-                "recipient_email": "",
+                "recipient_email": "",  # Deprecated - kept for backward compatibility
+                "recipients": [],  # New multi-recipient structure
+                "cc_recipients": [],  # CC recipients for daily reports
                 "report_time": "09:00",
                 "check_interval": "hourly",
                 "email_template": "daily_summary",
@@ -60,14 +62,14 @@ class ConfigManager:
                 with open(self.config_file, 'r', encoding='utf-8') as f:
                     config = json.load(f)
                     # Don't decrypt passwords - assume they're already in plain text
-                    print(f"✅ Loaded configuration from {self.config_file}")
+                    print(f"Loaded configuration from {self.config_file}")
                     return config
             except Exception as e:
-                print(f"⚠️ Error loading config, using defaults: {str(e)}")
+                print(f"Error loading config, using defaults: {str(e)}")
         
         # Create default config file
         self.save_config(default_config)
-        print(f"✅ Created default configuration at {self.config_file}")
+        print(f"Created default configuration at {self.config_file}")
         return default_config
     
     def save_config(self, config=None):
@@ -89,10 +91,10 @@ class ConfigManager:
         try:
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(save_config, f, indent=2, ensure_ascii=False)
-            print(f"✅ Configuration saved to {self.config_file}")
+            print(f"Configuration saved to {self.config_file}")
             return True
         except Exception as e:
-            print(f"❌ Error saving configuration: {str(e)}")
+            print(f"Error saving configuration: {str(e)}")
             return False
     
     def get(self, key, default=None):
@@ -150,10 +152,10 @@ class ConfigManager:
             
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(save_config, f, indent=2, ensure_ascii=False)
-            print(f"✅ Configuration saved to {self.config_file}")
+            print(f"Configuration saved to {self.config_file}")
             return True
         except Exception as e:
-            print(f"❌ Error saving configuration: {str(e)}")
+            print(f"Error saving configuration: {str(e)}")
             return False
     
     def is_time_to_send_report(self):
@@ -184,6 +186,57 @@ class ConfigManager:
         """Get configuration with decrypted passwords for use in scripts"""
         # self.config already has decrypted passwords from load_config()
         return json.loads(json.dumps(self.config))
+    
+    def get_recipients(self):
+        """Get the list of recipients, handling backward compatibility"""
+        # Check if we have the new recipients array
+        recipients = self.get("automated_reports.recipients", [])
+        
+        # If recipients array is empty, check for legacy recipient_email
+        if not recipients:
+            legacy_recipient = self.get("automated_reports.recipient_email", "")
+            if legacy_recipient and legacy_recipient.strip():
+                recipients = [{"email": legacy_recipient.strip(), "name": ""}]
+        
+        return recipients
+    
+    def set_recipients(self, recipients):
+        """Set recipients and update configuration"""
+        # Set the new recipients array
+        success = self.set("automated_reports.recipients", recipients)
+        
+        # For backward compatibility, also set recipient_email to the first recipient
+        if recipients and success:
+            first_recipient = recipients[0]
+            if isinstance(first_recipient, dict):
+                success = self.set("automated_reports.recipient_email", first_recipient.get("email", ""))
+            else:
+                success = self.set("automated_reports.recipient_email", first_recipient)
+        elif success:
+            # Clear legacy field if no recipients
+            success = self.set("automated_reports.recipient_email", "")
+        
+        return success
+    
+    def get_cc_recipients(self):
+        """Get the list of CC recipients"""
+        return self.get("automated_reports.cc_recipients", [])
+    
+    def set_cc_recipients(self, cc_recipients):
+        """Set CC recipients and update configuration"""
+        return self.set("automated_reports.cc_recipients", cc_recipients)
+    
+    def migrate_legacy_recipient(self):
+        """Migrate legacy recipient_email to new recipients array if needed"""
+        recipients = self.get("automated_reports.recipients", [])
+        legacy_recipient = self.get("automated_reports.recipient_email", "")
+        
+        # If we have a legacy recipient but no new recipients, migrate it
+        if legacy_recipient and legacy_recipient.strip() and not recipients:
+            new_recipients = [{"email": legacy_recipient.strip(), "name": ""}]
+            return self.set("automated_reports.recipients", new_recipients)
+        
+        return True
 
 # Test the configuration manager
 if __name__ == "__main__":
@@ -202,4 +255,4 @@ if __name__ == "__main__":
     print(f"Recipient: {config_manager.get('automated_reports.recipient_email')}")
     print(f"Password: {config_manager.get('automated_reports.odoo_connection.password')}")
     
-    print("✅ Configuration manager test completed!") 
+    print("Configuration manager test completed!") 

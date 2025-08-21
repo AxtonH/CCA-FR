@@ -37,9 +37,9 @@ const ConnectionPanel = () => {
   const [localMessage, setLocalMessage] = useState('');
 
   const [connectionDetails, setConnectionDetails] = useState({
-    url: 'https://prezlab-staging-22061821.dev.odoo.com',
-    database: 'prezlab-staging-22061821',
-    username: 'omar.elhasan@prezlab.com',
+    url: 'https://prezlab.odoo.com/',
+    database: 'odoo-ps-psae-prezlab-main-10779811',
+    username: '',
     password: '',
   });
 

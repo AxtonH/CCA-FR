@@ -3,9 +3,11 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
+import { useAuth } from './contexts/AuthContext';
 import DashboardPage from './pages/DashboardPage';
 import EmailSenderPage from './pages/EmailSenderPage';
 import SettingsPage from './pages/SettingsPage';
+import LoginPage from './pages/LoginPage';
 import './index.css';
 
 // Create a client for React Query
@@ -18,19 +20,38 @@ const queryClient = new QueryClient({
   },
 });
 
+function AppRoutes() {
+  const { isConnected } = useAuth();
+  return (
+    <Routes>
+      <Route
+        path="/login"
+        element={isConnected ? <Navigate to="/" replace /> : <LoginPage />}
+      />
+      <Route
+        path="/"
+        element={isConnected ? <DashboardPage /> : <Navigate to="/login" replace />}
+      />
+      <Route
+        path="/email-sender"
+        element={isConnected ? <EmailSenderPage /> : <Navigate to="/login" replace />}
+      />
+      <Route
+        path="/settings"
+        element={isConnected ? <SettingsPage /> : <Navigate to="/login" replace />}
+      />
+      <Route path="*" element={<Navigate to={isConnected ? '/' : '/login'} replace />} />
+    </Routes>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <Router>
           <div className="App">
-            <Routes>
-              <Route path="/" element={<DashboardPage />} />
-              <Route path="/email-sender" element={<EmailSenderPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-            
+            <AppRoutes />
             {/* Toast notifications */}
             <Toaster
               position="top-right"

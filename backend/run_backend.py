@@ -35,8 +35,18 @@ except ImportError as e:
     print(f"Warning: Could not import core modules: {e}")
     print("   Backend will run in demo mode only")
 
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
 # Store active connections
 active_connections = {}
+
+# Get allowed users from environment or use defaults
+allowed_users_str = os.getenv('ALLOWED_USER_EMAILS', 'omar.elhasan@prezlab.com,sanad.zaqtan@prezlab.com')
+ALLOWED_USER_EMAILS = {email.strip().lower() for email in allowed_users_str.split(',')}
 
 @app.route('/api/odoo/connect', methods=['POST'])
 def connect_odoo():
@@ -55,7 +65,40 @@ def connect_odoo():
         connector = OdooConnector(url, database, username, password)
         
         if not connector.connect():
-            return jsonify({'error': 'Failed to connect to Odoo'}), 401
+            message = getattr(connector, 'last_error', None) or 'Failed to connect to Odoo'
+            # Normalize common auth failures
+            if 'authentication' in message.lower() or 'invalid' in message.lower():
+                return jsonify({'error': message}), 401
+            return jsonify({'error': message}), 400
+        
+        # Authorization: check authenticated user's email/login
+        try:
+            user_email = None
+            if hasattr(connector, 'models') and connector.models and connector.uid:
+                try:
+                    user_data = connector.models.execute_kw(
+                        connector.database,
+                        connector.uid,
+                        connector.password,
+                        'res.users',
+                        'read',
+                        [[connector.uid]],
+                        {'fields': ['login', 'email']}
+                    )
+                    if isinstance(user_data, list) and user_data:
+                        user_email = (user_data[0].get('login') or user_data[0].get('email') or '').strip()
+                except Exception as e:
+                    print(f"❌ Error reading user info from Odoo: {str(e)}")
+            # Fallback to provided username if API read failed
+            if not user_email:
+                user_email = (username or '').strip()
+            # Enforce allowed users only
+            if user_email.lower() not in {e.lower() for e in ALLOWED_USER_EMAILS}:
+                print(f"❌ Unauthorized user attempted login: {user_email}")
+                return jsonify({'error': 'This account is not authorized to access this application.'}), 403
+        except Exception as e:
+            print(f"❌ Authorization check failed: {str(e)}")
+            return jsonify({'error': 'Authorization check failed. Please try again later.'}), 500
         
         # Fetch overdue invoices with progress callback
         def progress_callback(message, progress):
@@ -785,13 +828,22 @@ def test_automated_report():
         
         # Send test email
         if send_daily_report_email(config, report_data):
+            # Get recipients for response message
+            recipients = config['automated_reports'].get('recipients', [])
+            if not recipients:
+                recipients = [{"email": config['automated_reports'].get('recipient_email', ''), "name": ""}]
+            
+            recipient_emails = [r.get('email', r) if isinstance(r, dict) else r for r in recipients]
+            recipient_list = ', '.join(recipient_emails)
+            
             return jsonify({
                 'success': True,
-                'message': f'Test report sent successfully to {config["automated_reports"]["recipient_email"]}',
+                'message': f'Test report sent successfully to {len(recipients)} recipient(s): {recipient_list}',
                 'report_summary': {
                     'total_invoices': report_data['total_invoices'],
                     'total_amount': report_data['total_amount'],
-                    'total_clients': report_data['total_clients']
+                    'total_clients': report_data['total_clients'],
+                    'recipients_count': len(recipients)
                 }
             })
         else:

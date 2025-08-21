@@ -84,13 +84,13 @@ def generate_pdf_report(invoices, top_clients=None, severe_clients=None, moderat
         # Build the story (content)
         story = []
         
-        # Title - exactly like download button
-        story.append(Paragraph("OVERDUE INVOICES REPORT", title_style))
+        # Title with emoji - enhanced
+        story.append(Paragraph("📊 DAILY INVOICE FOLLOW-UP REPORT", title_style))
         story.append(Spacer(1, 15))
         
-        # Date - exactly like download button
+        # Date - enhanced formatting
         story.append(Paragraph(f"Generated on: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", date_style))
-        story.append(Spacer(1, 25))
+        story.append(Spacer(1, 30))
         
         # Summary Section - exactly like download button
         story.append(Paragraph("SUMMARY", heading_style))
@@ -440,6 +440,274 @@ def generate_daily_report(connector):
         log_message(f"Error generating report: {str(e)}", "ERROR")
         return None
 
+def generate_html_email_template(recipient_name, report_data):
+    """Generate professional HTML email template"""
+    greeting = recipient_name if recipient_name else "Finance Team"
+    date_str = datetime.now().strftime('%B %d, %Y')
+    
+    # Generate top clients table HTML
+    top_clients_html = ""
+    if report_data.get('top_clients_to_follow_up'):
+        top_clients_html = """
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <thead>
+                <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <th style="padding: 15px 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #5a67d8;">#</th>
+                    <th style="padding: 15px 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #5a67d8;">Client Name</th>
+                    <th style="padding: 15px 12px; text-align: right; font-weight: 600; border-bottom: 2px solid #5a67d8;">Outstanding Amount</th>
+                    <th style="padding: 15px 12px; text-align: center; font-weight: 600; border-bottom: 2px solid #5a67d8;">Max Days Overdue</th>
+                    <th style="padding: 15px 12px; text-align: center; font-weight: 600; border-bottom: 2px solid #5a67d8;">Avg Days Overdue</th>
+                    <th style="padding: 15px 12px; text-align: center; font-weight: 600; border-bottom: 2px solid #5a67d8;">Invoices</th>
+                </tr>
+            </thead>
+            <tbody>"""
+        
+        for i, client in enumerate(report_data['top_clients_to_follow_up'], 1):
+            # Determine urgency color based on max days overdue
+            if client['max_days_overdue'] > 60:
+                urgency_color = "#dc2626"  # Red
+                urgency_label = "CRITICAL"
+            elif client['max_days_overdue'] > 30:
+                urgency_color = "#d97706"  # Orange
+                urgency_label = "HIGH"
+            else:
+                urgency_color = "#059669"  # Green
+                urgency_label = "MODERATE"
+            
+            # Alternate row colors
+            bg_color = "#f9fafb" if i % 2 == 0 else "#ffffff"
+            
+            top_clients_html += f"""
+                <tr style="background-color: {bg_color}; border-bottom: 1px solid #e5e7eb;">
+                    <td style="padding: 12px; font-weight: 600; color: {urgency_color};">#{i}</td>
+                    <td style="padding: 12px;">
+                        <div style="font-weight: 600; color: #1f2937; margin-bottom: 2px;">{client['client_name']}</div>
+                        <div style="font-size: 12px; color: {urgency_color}; font-weight: 600; text-transform: uppercase;">{urgency_label} PRIORITY</div>
+                    </td>
+                    <td style="padding: 12px; text-align: right; font-weight: 600; color: #dc2626; font-size: 16px;">${client['total_amount']:,.2f}</td>
+                    <td style="padding: 12px; text-align: center;">
+                        <span style="background-color: {urgency_color}; color: white; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 600;">{client['max_days_overdue']}</span>
+                    </td>
+                    <td style="padding: 12px; text-align: center; color: #6b7280;">{client['avg_days_overdue']}</td>
+                    <td style="padding: 12px; text-align: center; color: #6b7280;">{client['invoice_count']}</td>
+                </tr>"""
+        
+        top_clients_html += """
+            </tbody>
+        </table>"""
+    else:
+        top_clients_html = """
+        <div style="background: #f3f4f6; border: 2px dashed #d1d5db; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
+            <p style="color: #6b7280; font-size: 14px; margin: 0;">No clients identified for immediate follow-up</p>
+        </div>"""
+    
+    html_template = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Daily Invoice Follow-Up Report</title>
+    </head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f8fafc; margin: 0; padding: 20px;">
+        
+        <!-- Main Container -->
+        <div style="max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+            
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center;">
+                <h1 style="margin: 0 0 10px 0; font-size: 28px; font-weight: 700;">📊 Daily Invoice Follow-Up Report</h1>
+                <p style="margin: 0; font-size: 16px; opacity: 0.9;">{date_str}</p>
+            </div>
+            
+            <!-- Greeting -->
+            <div style="padding: 30px 30px 20px 30px;">
+                <h2 style="color: #1f2937; margin: 0 0 20px 0; font-size: 20px;">Dear {greeting},</h2>
+                <p style="color: #4b5563; margin: 0 0 25px 0; font-size: 16px;">
+                    Please find below your daily invoice follow-up report with key metrics and priority clients requiring immediate attention.
+                </p>
+            </div>
+            
+            <!-- Summary Cards -->
+            <div style="padding: 0 30px 20px 30px;">
+                <h3 style="color: #1f2937; margin: 0 0 20px 0; font-size: 18px; font-weight: 600;">📈 Summary Overview</h3>
+                <div style="display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 30px; max-width: 400px; margin-left: auto; margin-right: auto;">
+                    
+                    <div style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border: 1px solid #fca5a5; border-radius: 10px; padding: 20px; text-align: center;">
+                        <div style="font-size: 24px; font-weight: 700; color: #dc2626; margin-bottom: 5px;">{report_data['total_invoices']}</div>
+                        <div style="font-size: 14px; color: #7f1d1d; font-weight: 600;">Overdue Invoices</div>
+                    </div>
+                    
+                    <div style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border: 1px solid #93c5fd; border-radius: 10px; padding: 20px; text-align: center;">
+                        <div style="font-size: 24px; font-weight: 700; color: #2563eb; margin-bottom: 5px;">${report_data['total_amount']:,.0f}</div>
+                        <div style="font-size: 14px; color: #1e3a8a; font-weight: 600;">Outstanding Amount</div>
+                    </div>
+                    
+                    <div style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border: 1px solid #6ee7b7; border-radius: 10px; padding: 20px; text-align: center;">
+                        <div style="font-size: 24px; font-weight: 700; color: #059669; margin-bottom: 5px;">{report_data['total_clients']}</div>
+                        <div style="font-size: 14px; color: #064e3b; font-weight: 600;">Affected Clients</div>
+                    </div>
+                    
+                </div>
+            </div>
+            
+            <!-- Top Clients Section -->
+            <div style="padding: 0 30px 30px 30px;">
+                <h3 style="color: #1f2937; margin: 0 0 20px 0; font-size: 18px; font-weight: 600;">🎯 Top 3 Clients Requiring Follow-Up</h3>
+                {top_clients_html}
+            </div>
+            
+            <!-- Attachments Section -->
+            <div style="background: #f8fafc; border-top: 1px solid #e5e7eb; padding: 25px 30px;">
+                <h3 style="color: #1f2937; margin: 0 0 15px 0; font-size: 16px; font-weight: 600;">📎 Attached Documents</h3>
+                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                    <div style="background: white; border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 10px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);">
+                        <div style="background: #10b981; color: white; border-radius: 6px; padding: 6px; font-size: 12px; font-weight: 600;">CSV</div>
+                        <span style="color: #4b5563; font-size: 14px;">Detailed invoice data</span>
+                    </div>
+                    <div style="background: white; border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 10px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);">
+                        <div style="background: #dc2626; color: white; border-radius: 6px; padding: 6px; font-size: 12px; font-weight: 600;">PDF</div>
+                        <span style="color: #4b5563; font-size: 14px;">Formatted report</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div style="background: #1f2937; color: white; padding: 20px 30px; text-align: center;">
+                <p style="margin: 0 0 10px 0; font-size: 14px; opacity: 0.8;">
+                    This report was automatically generated by the Invoice Follow-Up System
+                </p>
+                <p style="margin: 0; font-size: 12px; opacity: 0.6;">
+                    Report generated on {datetime.now().strftime('%Y-%m-%d at %H:%M:%S')}
+                </p>
+            </div>
+            
+        </div>
+    </body>
+    </html>
+    """
+    
+    return html_template
+
+def send_consolidated_email(sender_email, sender_password, to_list, cc_list, subject, body, attachments=None, smtp_server="smtp.gmail.com", smtp_port=587):
+    """Send a single consolidated email to multiple recipients with CC support"""
+    try:
+        import smtplib
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+        from email.mime.base import MIMEBase
+        from email import encoders
+        import re
+        
+        log_message(f"📧 Sending consolidated email:")
+        log_message(f"   From: {sender_email}")
+        log_message(f"   To: {', '.join(to_list)}")
+        log_message(f"   CC: {', '.join(cc_list) if cc_list else 'None'}")
+        log_message(f"   SMTP: {smtp_server}:{smtp_port}")
+        
+        # Check if body contains HTML tags to determine format
+        is_html = ('<table>' in body or '<tr>' in body or '<td>' in body or '<th>' in body or 
+                  '<html>' in body or '<div>' in body or '<p>' in body or '<span>' in body or 
+                  '<head>' in body or '<body>' in body or 'DOCTYPE html' in body)
+        log_message(f"   Content type: {'HTML' if is_html else 'Plain text'}")
+        
+        if is_html:
+            # Create a multipart alternative message for better HTML support
+            
+            # Create plain text version (strip HTML tags)
+            plain_text = re.sub(r'<[^>]+>', '', body)
+            plain_text = re.sub(r'\s+', ' ', plain_text).strip()
+            
+            # Create the main message as multipart alternative
+            msg = MIMEMultipart('alternative')
+            msg['From'] = sender_email
+            msg['To'] = ', '.join(to_list)
+            msg['Subject'] = subject
+            
+            if cc_list:
+                msg['Cc'] = ', '.join(cc_list)
+            
+            # Attach plain text version first
+            text_part = MIMEText(plain_text, 'plain', 'utf-8')
+            msg.attach(text_part)
+            
+            # Attach HTML version
+            html_part = MIMEText(body, 'html', 'utf-8')
+            msg.attach(html_part)
+        else:
+            # For plain text, use simple MIMEText
+            msg = MIMEText(body, 'plain', 'utf-8')
+            msg['From'] = sender_email
+            msg['To'] = ', '.join(to_list)
+            msg['Subject'] = subject
+            
+            if cc_list:
+                msg['Cc'] = ', '.join(cc_list)
+        
+        # Add attachments
+        if attachments:
+            # If we have attachments, we need to wrap the message in a multipart/mixed
+            if is_html:
+                # Create a new multipart/mixed message
+                mixed_msg = MIMEMultipart('mixed')
+                mixed_msg['From'] = sender_email
+                mixed_msg['To'] = ', '.join(to_list)
+                mixed_msg['Subject'] = subject
+                
+                if cc_list:
+                    mixed_msg['Cc'] = ', '.join(cc_list)
+                
+                # Attach the alternative part (text + html)
+                mixed_msg.attach(msg)
+                msg = mixed_msg
+            else:
+                # Convert plain text to multipart/mixed
+                mixed_msg = MIMEMultipart('mixed')
+                mixed_msg['From'] = sender_email
+                mixed_msg['To'] = ', '.join(to_list)
+                mixed_msg['Subject'] = subject
+                
+                if cc_list:
+                    mixed_msg['Cc'] = ', '.join(cc_list)
+                
+                # Attach the plain text part
+                mixed_msg.attach(msg)
+                msg = mixed_msg
+            
+            # Add file attachments
+            for attachment in attachments:
+                if isinstance(attachment, dict) and 'data' in attachment and 'filename' in attachment:
+                    part = MIMEBase('application', 'octet-stream')
+                    part.set_payload(attachment['data'])
+                    encoders.encode_base64(part)
+                    part.add_header(
+                        'Content-Disposition',
+                        f'attachment; filename= {attachment["filename"]}'
+                    )
+                    msg.attach(part)
+                    log_message(f"   Attached: {attachment['filename']} ({len(attachment['data'])} bytes)")
+        
+        # Send the email
+        log_message(f"   Connecting to SMTP server...")
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        
+        # Build complete recipient list (TO + CC)
+        all_recipients = to_list + (cc_list if cc_list else [])
+        
+        log_message(f"   Sending to {len(all_recipients)} total recipients...")
+        text = msg.as_string()
+        server.sendmail(sender_email, all_recipients, text)
+        server.quit()
+        
+        log_message(f"✅ Consolidated email sent successfully!")
+        return True
+        
+    except Exception as e:
+        log_message(f"❌ Error sending consolidated email: {str(e)}", "ERROR")
+        return False
+
 def send_daily_report_email(config, report_data):
     """Send the daily report via email with threading support"""
     try:
@@ -454,113 +722,155 @@ def send_daily_report_email(config, report_data):
         
         # Get email settings
         email_config = config['automated_reports']['email_settings']
-        recipient_email = config['automated_reports']['recipient_email']
         
-        # Create message
-        msg = MIMEMultipart()
-        msg['From'] = email_config['sender_email']
-        msg['To'] = recipient_email
-        msg['Subject'] = f"Daily Invoice Follow-Up Report - {datetime.now().strftime('%Y-%m-%d')}"
+        # Get recipients - support both legacy and new format
+        recipients = config['automated_reports'].get('recipients', [])
+        if not recipients:
+            # Fallback to legacy recipient_email
+            legacy_recipient = config['automated_reports'].get('recipient_email', '')
+            if legacy_recipient and legacy_recipient.strip():
+                recipients = [{"email": legacy_recipient.strip(), "name": ""}]
+            else:
+                log_message("No recipients configured for daily reports", "ERROR")
+                return False
         
-        # Create email body
-        body = f"""Dear Finance Team,
+        # Get CC recipients
+        cc_recipients = config['automated_reports'].get('cc_recipients', [])
+        
+        # Build recipient list for TO field (convert format if needed)
+        to_list = []
+        for recipient in recipients:
+            if isinstance(recipient, dict):
+                recipient_email = recipient.get('email', '').strip()
+                recipient_name = recipient.get('name', '').strip()
+            else:
+                recipient_email = str(recipient).strip()
+                recipient_name = ""
+            
+            if recipient_email:
+                to_list.append(recipient_email)
+        
+        # Build CC email list (convert format if needed)
+        cc_list = []
+        for cc_recipient in cc_recipients:
+            if isinstance(cc_recipient, dict):
+                cc_email = cc_recipient.get('email', '').strip()
+            else:
+                cc_email = str(cc_recipient).strip()
+            
+            if cc_email:
+                cc_list.append(cc_email)
+        
+        if not to_list:
+            log_message("No valid recipient email addresses found", "ERROR")
+            return False
+        
+        log_message(f"Sending single consolidated daily report to {len(to_list)} recipients with {len(cc_list)} CC recipients")
+        log_message(f"TO: {', '.join(to_list)}")
+        if cc_list:
+            log_message(f"CC: {', '.join(cc_list)}")
+        
+        try:
+            # Create subject
+            subject = f"Daily Invoice Follow-Up Report - {datetime.now().strftime('%Y-%m-%d')}"
+            
+            # Use generic greeting for consolidated email
+            html_body = generate_html_email_template("Finance Team", report_data)
+            
+            # Create plain text fallback
+            plain_text_body = f"""Dear Finance Team,
 
 Please find attached the daily invoice follow-up report for {datetime.now().strftime('%Y-%m-%d')}.
 
-Summary:
+SUMMARY OVERVIEW
 - Total Overdue Invoices: {report_data['total_invoices']}
 - Total Outstanding Amount: ${report_data['total_amount']:,.2f}
 - Clients with Overdue Invoices: {report_data['total_clients']}
 
-Top 3 Clients to Follow Up On:
+TOP 3 CLIENTS REQUIRING FOLLOW-UP
 """
-        
-        # Add top clients information to email body
-        if report_data.get('top_clients_to_follow_up'):
-            for i, client in enumerate(report_data['top_clients_to_follow_up'], 1):
-                body += f"""
-{i}. {client['client_name']}
-   - Total Amount: ${client['total_amount']:,.2f}
-   - Max Days Overdue: {client['max_days_overdue']} days
-   - Average Days Overdue: {client['avg_days_overdue']} days
-   - Invoice Count: {client['invoice_count']}
+            
+            # Add top clients information to plain text body
+            if report_data.get('top_clients_to_follow_up'):
+                plain_text_body += "\n" + "="*70 + "\n"
+                for i, client in enumerate(report_data['top_clients_to_follow_up'], 1):
+                    # Determine priority level
+                    if client['max_days_overdue'] > 60:
+                        priority = "CRITICAL"
+                    elif client['max_days_overdue'] > 30:
+                        priority = "HIGH"
+                    else:
+                        priority = "MODERATE"
+                        
+                    plain_text_body += f"""
+{i}. {client['client_name']} ({priority} PRIORITY)
+   • Outstanding Amount: ${client['total_amount']:,.2f}
+   • Max Days Overdue: {client['max_days_overdue']} days
+   • Average Days Overdue: {client['avg_days_overdue']} days
+   • Invoice Count: {client['invoice_count']}
 """
-        else:
-            body += "No clients identified for follow-up at this time.\n"
-        
-        body += f"""
+                plain_text_body += "="*70 + "\n"
+            else:
+                plain_text_body += "\nNo clients identified for immediate follow-up.\n"
+            
+            plain_text_body += f"""
 
-The detailed report is attached as a CSV file.
+ATTACHED DOCUMENTS
+• CSV file: Detailed invoice data for analysis
+• PDF file: Formatted report for presentation
+
+This report was automatically generated by the Invoice Follow-Up System
+Generated on {datetime.now().strftime('%Y-%m-%d at %H:%M:%S')}
 
 Best regards,
 Invoice Follow-Up System
 """
-        
-        msg.attach(MIMEText(body, 'plain'))
-        
-        # Attach CSV file
-        csv_attachment = MIMEBase('text', 'csv')
-        csv_attachment.set_payload(report_data['csv_content'])
-        encoders.encode_base64(csv_attachment)
-        csv_attachment.add_header(
-            'Content-Disposition', 
-            f'attachment; filename="invoice_followup_report_{datetime.now().strftime("%Y%m%d")}.csv"'
-        )
-        msg.attach(csv_attachment)
-
-        # Attach PDF file if available
-        if report_data.get('pdf_content'):
-            pdf_attachment = MIMEBase('application', 'pdf')
-            pdf_attachment.set_payload(report_data['pdf_content'])
-            encoders.encode_base64(pdf_attachment)
-            pdf_attachment.add_header(
-                'Content-Disposition',
-                f'attachment; filename="invoice_followup_report_{datetime.now().strftime("%Y%m%d")}.pdf"'
-            )
-            msg.attach(pdf_attachment)
-            log_message("PDF attachment added to email")
-        else:
-            log_message("No PDF content available, sending CSV only", "WARNING")
-        
-        # Prepare attachments for threading
-        attachments = []
-        
-        # Add CSV attachment
-        csv_attachment = {
-            'data': report_data['csv_content'].encode('utf-8'),
-            'filename': f"invoice_followup_report_{datetime.now().strftime('%Y%m%d')}.csv"
-        }
-        attachments.append(csv_attachment)
-        
-        # Add PDF attachment if available
-        if report_data.get('pdf_content'):
-            pdf_attachment = {
-                'data': report_data['pdf_content'],
-                'filename': f"invoice_followup_report_{datetime.now().strftime('%Y%m%d')}.pdf"
+            
+            # Prepare attachments
+            attachments = []
+            
+            # Add CSV attachment
+            csv_attachment = {
+                'data': report_data['csv_content'].encode('utf-8'),
+                'filename': f"invoice_followup_report_{datetime.now().strftime('%Y%m%d')}.csv"
             }
-            attachments.append(pdf_attachment)
-        
-        # Send email using threading support
-        success = send_email(
-            sender_email=email_config['sender_email'],
-            sender_password=email_config['sender_password'],
-            recipient_email=recipient_email,
-            cc_list=[],
-            subject=msg['Subject'],
-            body=body,
-            attachments=attachments,
-            smtp_server=email_config['smtp_server'],
-            smtp_port=email_config['smtp_port'],
-            client_name="Finance Team",
-            company_name="Daily Reports",
-            enable_threading=True
-        )
-        
-        if success:
-            log_message(f"Email sent successfully to {recipient_email}")
-            return True
-        else:
-            log_message(f"Failed to send email to {recipient_email}", "ERROR")
+            attachments.append(csv_attachment)
+            
+            # Add PDF attachment if available
+            if report_data.get('pdf_content'):
+                pdf_attachment = {
+                    'data': report_data['pdf_content'],
+                    'filename': f"invoice_followup_report_{datetime.now().strftime('%Y%m%d')}.pdf"
+                }
+                attachments.append(pdf_attachment)
+            
+            # Send single consolidated email to all recipients
+            # Use first recipient as primary, others will be in TO field via SMTP
+            primary_recipient = to_list[0]
+            
+            # For consolidated emails, we need to modify the core send_email function
+            # to handle multiple TO recipients. For now, we'll use a workaround.
+            success = send_consolidated_email(
+                sender_email=email_config['sender_email'],
+                sender_password=email_config['sender_password'],
+                to_list=to_list,
+                cc_list=cc_list,
+                subject=subject,
+                body=html_body,  # Use HTML body for rich formatting
+                attachments=attachments,
+                smtp_server=email_config['smtp_server'],
+                smtp_port=email_config['smtp_port']
+            )
+            
+            if success:
+                log_message(f"✅ Consolidated daily report sent successfully to {len(to_list)} recipients with {len(cc_list)} CC recipients")
+                return True
+            else:
+                log_message(f"❌ Failed to send consolidated daily report", "ERROR")
+                return False
+                
+        except Exception as e:
+            log_message(f"❌ Error sending consolidated email: {str(e)}", "ERROR")
             return False
         
     except Exception as e:

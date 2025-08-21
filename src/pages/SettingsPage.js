@@ -21,7 +21,13 @@ import {
   Download,
   FileText,
   Eye,
-  EyeOff
+  EyeOff,
+  Plus,
+  Trash2,
+  Users,
+  User,
+  AtSign,
+  BadgeCheck
 } from 'lucide-react';
 
 // Helper function to get currency symbol
@@ -84,10 +90,10 @@ const SettingsPage = () => {
   const [localMessage, setLocalMessage] = useState('');
 
   const [connectionDetails, setConnectionDetails] = useState({
-    url: 'https://prezlab-staging-22061821.dev.odoo.com',
-    database: 'prezlab-staging-22061821',
-    username: 'omar.elhasan@prezlab.com',
-    password: 'Omar@@1998',
+    url: 'https://prezlab.odoo.com/',
+    database: 'odoo-ps-psae-prezlab-main-10779811',
+    username: '',
+    password: '',
   });
 
   const [emailConfig, setEmailConfig] = useState(settings.emailConfig);
@@ -106,7 +112,9 @@ const SettingsPage = () => {
   // Automated Reports state
   const [automatedReportsConfig, setAutomatedReportsConfig] = useState({
     enabled: false,
-    recipient_email: '',
+    recipient_email: '', // Kept for backward compatibility
+    recipients: [], // New multi-recipient structure: [{email: "...", name: "..."}, ...]
+    cc_recipients: [], // CC recipients for daily reports: [{email: "...", name: "..."}, ...]
     report_time: '09:00',
     check_interval: 'hourly',
     email_template: 'daily_summary',
@@ -119,8 +127,8 @@ const SettingsPage = () => {
     email_settings: {
       smtp_server: 'smtp.gmail.com',
       smtp_port: 587,
-      sender_email: 'omar.elhasan@prezlab.com',
-      sender_password: 'cnns amsx gxxj ixnm'
+      sender_email: '',
+      sender_password: ''
     }
   });
   const [showAutomatedReportsForm, setShowAutomatedReportsForm] = useState(false);
@@ -222,12 +230,50 @@ const SettingsPage = () => {
 
   // Save automated reports configuration
   const saveAutomatedReportsConfig = async () => {
+    // Validate recipients before saving
+    const invalidRecipients = automatedReportsConfig.recipients.filter(r => r.email && !isValidEmail(r.email));
+    const emptyRecipients = automatedReportsConfig.recipients.filter(r => !r.email);
+    
+    // Validate CC recipients before saving
+    const invalidCCRecipients = automatedReportsConfig.cc_recipients.filter(r => r.email && !isValidEmail(r.email));
+    const emptyCCRecipients = automatedReportsConfig.cc_recipients.filter(r => !r.email);
+    
+    if (invalidRecipients.length > 0) {
+      alert(`Please fix ${invalidRecipients.length} invalid recipient email address${invalidRecipients.length > 1 ? 'es' : ''} before saving.`);
+      return;
+    }
+    
+    if (invalidCCRecipients.length > 0) {
+      alert(`Please fix ${invalidCCRecipients.length} invalid CC recipient email address${invalidCCRecipients.length > 1 ? 'es' : ''} before saving.`);
+      return;
+    }
+    
+    if (emptyRecipients.length > 0) {
+      const confirmed = window.confirm(`${emptyRecipients.length} recipient${emptyRecipients.length > 1 ? 's have' : ' has'} empty email addresses. These will be removed when saving. Continue?`);
+      if (!confirmed) return;
+      
+      // Remove empty recipients
+      const validRecipients = automatedReportsConfig.recipients.filter(r => r.email);
+      setAutomatedReportsConfig(prev => ({ ...prev, recipients: validRecipients }));
+    }
+    
+    if (emptyCCRecipients.length > 0) {
+      const confirmed = window.confirm(`${emptyCCRecipients.length} CC recipient${emptyCCRecipients.length > 1 ? 's have' : ' has'} empty email addresses. These will be removed when saving. Continue?`);
+      if (!confirmed) return;
+      
+      // Remove empty CC recipients
+      const validCCRecipients = automatedReportsConfig.cc_recipients.filter(r => r.email);
+      setAutomatedReportsConfig(prev => ({ ...prev, cc_recipients: validCCRecipients }));
+    }
+
     setIsSavingAutomatedConfig(true);
     try {
       const requestBody = {
         updates: {
           enabled: automatedReportsConfig.enabled,
-          recipient_email: automatedReportsConfig.recipient_email,
+          recipient_email: automatedReportsConfig.recipient_email, // Keep for backward compatibility
+          recipients: automatedReportsConfig.recipients, // New multi-recipient structure
+          cc_recipients: automatedReportsConfig.cc_recipients, // CC recipients for daily reports
           report_time: automatedReportsConfig.report_time,
           check_interval: automatedReportsConfig.check_interval,
           email_template: automatedReportsConfig.email_template,
@@ -260,6 +306,98 @@ const SettingsPage = () => {
       setIsSavingAutomatedConfig(false);
     }
   };
+
+  // Helper functions for managing recipients
+  const isValidEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const addRecipient = () => {
+    const newRecipients = [...automatedReportsConfig.recipients, { email: '', name: '' }];
+    setAutomatedReportsConfig(prev => ({ ...prev, recipients: newRecipients }));
+  };
+
+  const addBulkRecipients = () => {
+    const emails = prompt(
+      'Enter multiple email addresses separated by commas or new lines:\n\nExample:\nfinance@company.com\nadmin@company.com, reports@company.com'
+    );
+    
+    if (emails) {
+      const emailList = emails
+        .split(/[,\n]/)
+        .map(email => email.trim())
+        .filter(email => email)
+        .map(email => ({ email, name: '' }));
+      
+      if (emailList.length > 0) {
+        const newRecipients = [...automatedReportsConfig.recipients, ...emailList];
+        setAutomatedReportsConfig(prev => ({ ...prev, recipients: newRecipients }));
+      }
+    }
+  };
+
+  const removeRecipient = (index) => {
+    const newRecipients = automatedReportsConfig.recipients.filter((_, i) => i !== index);
+    setAutomatedReportsConfig(prev => ({ ...prev, recipients: newRecipients }));
+  };
+
+  const updateRecipient = (index, field, value) => {
+    const newRecipients = [...automatedReportsConfig.recipients];
+    newRecipients[index][field] = value;
+    setAutomatedReportsConfig(prev => ({ ...prev, recipients: newRecipients }));
+    
+    // Also update legacy field for backward compatibility (first recipient)
+    if (index === 0 && field === 'email') {
+      setAutomatedReportsConfig(prev => ({ ...prev, recipient_email: value }));
+    }
+  };
+
+  // Helper functions for managing CC recipients
+  const addCCRecipient = () => {
+    const newCCRecipients = [...automatedReportsConfig.cc_recipients, { email: '', name: '' }];
+    setAutomatedReportsConfig(prev => ({ ...prev, cc_recipients: newCCRecipients }));
+  };
+
+  const addBulkCCRecipients = () => {
+    const emails = prompt(
+      'Enter multiple CC email addresses separated by commas or new lines:\n\nExample:\nmanager@company.com\nsupervisor@company.com, director@company.com'
+    );
+    
+    if (emails) {
+      const emailList = emails
+        .split(/[,\n]/)
+        .map(email => email.trim())
+        .filter(email => email)
+        .map(email => ({ email, name: '' }));
+      
+      if (emailList.length > 0) {
+        const newCCRecipients = [...automatedReportsConfig.cc_recipients, ...emailList];
+        setAutomatedReportsConfig(prev => ({ ...prev, cc_recipients: newCCRecipients }));
+      }
+    }
+  };
+
+  const removeCCRecipient = (index) => {
+    const newCCRecipients = automatedReportsConfig.cc_recipients.filter((_, i) => i !== index);
+    setAutomatedReportsConfig(prev => ({ ...prev, cc_recipients: newCCRecipients }));
+  };
+
+  const updateCCRecipient = (index, field, value) => {
+    const newCCRecipients = [...automatedReportsConfig.cc_recipients];
+    newCCRecipients[index][field] = value;
+    setAutomatedReportsConfig(prev => ({ ...prev, cc_recipients: newCCRecipients }));
+  };
+
+  // Migrate legacy recipient_email to recipients array if needed
+  useEffect(() => {
+    if (automatedReportsConfig.recipient_email && automatedReportsConfig.recipients.length === 0) {
+      setAutomatedReportsConfig(prev => ({
+        ...prev,
+        recipients: [{ email: prev.recipient_email, name: '' }]
+      }));
+    }
+  }, [automatedReportsConfig.recipient_email, automatedReportsConfig.recipients.length]);
 
   // Test automated report
   const testAutomatedReport = async () => {
@@ -1360,7 +1498,28 @@ END OF REPORT
                   {automatedReportsConfig.enabled && (
                     <div className="text-xs text-gray-500 space-y-1">
                       <p>• Status: Enabled</p>
-                      <p>• Recipient: {automatedReportsConfig.recipient_email}</p>
+                      <p>• Recipients: {automatedReportsConfig.recipients?.length || 0} configured</p>
+                      {automatedReportsConfig.recipients?.length > 0 && (
+                        <div className="ml-2 space-y-1">
+                          {automatedReportsConfig.recipients.slice(0, 2).map((recipient, index) => (
+                            <p key={index}>- {recipient.name ? `${recipient.name} (${recipient.email})` : recipient.email}</p>
+                          ))}
+                          {automatedReportsConfig.recipients.length > 2 && (
+                            <p>- ... and {automatedReportsConfig.recipients.length - 2} more</p>
+                          )}
+                        </div>
+                      )}
+                      <p>• CC Recipients: {automatedReportsConfig.cc_recipients?.length || 0} configured</p>
+                      {automatedReportsConfig.cc_recipients?.length > 0 && (
+                        <div className="ml-2 space-y-1">
+                          {automatedReportsConfig.cc_recipients.slice(0, 2).map((ccRecipient, index) => (
+                            <p key={index}>- {ccRecipient.name ? `${ccRecipient.name} (${ccRecipient.email})` : ccRecipient.email}</p>
+                          ))}
+                          {automatedReportsConfig.cc_recipients.length > 2 && (
+                            <p>- ... and {automatedReportsConfig.cc_recipients.length - 2} more</p>
+                          )}
+                        </div>
+                      )}
                       <p>• Time: {automatedReportsConfig.report_time}</p>
                       <p>• Schedule: {automatedReportsConfig.check_interval}</p>
                     </div>
@@ -1389,14 +1548,325 @@ END OF REPORT
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Recipient Email</label>
-                    <Input
-                      value={automatedReportsConfig.recipient_email}
-                      onChange={(e) => setAutomatedReportsConfig(prev => ({ ...prev, recipient_email: e.target.value }))}
-                      type="email"
-                      placeholder="finance@company.com"
-                    />
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-blue-600" />
+                        <label className="text-sm font-medium text-gray-900">Report Recipients</label>
+                        <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full font-medium">
+                          {automatedReportsConfig.recipients.length}
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={addRecipient}
+                          className="text-xs px-3 py-2 flex items-center gap-1.5 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          Add One
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={addBulkRecipients}
+                          className="text-xs px-3 py-2 flex items-center gap-1.5 hover:bg-green-50 hover:text-green-700 hover:border-green-300 transition-colors"
+                        >
+                          <Users className="h-3.5 w-3.5" />
+                          Add Multiple
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {automatedReportsConfig.recipients.length === 0 ? (
+                        <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+                          <Users className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                          <p className="text-sm text-gray-500 mb-2">No recipients configured</p>
+                          <p className="text-xs text-gray-400 mb-4">Add recipients to receive automated daily reports</p>
+                          <div className="flex gap-2 justify-center">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={addRecipient}
+                              className="text-xs px-4 py-2 flex items-center gap-2"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              Add One Recipient
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={addBulkRecipients}
+                              className="text-xs px-4 py-2 flex items-center gap-2"
+                            >
+                              <Users className="h-3.5 w-3.5" />
+                              Add Multiple
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="max-h-64 overflow-y-auto pr-2 space-y-3">
+                          {automatedReportsConfig.recipients.map((recipient, index) => (
+                            <div 
+                              key={index} 
+                              className="group relative bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200"
+                            >
+                              {/* Recipient Header */}
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="p-2 bg-blue-100 rounded-lg">
+                                    <User className="h-4 w-4 text-blue-600" />
+                                  </div>
+                                  <div className="text-sm font-medium text-gray-900">
+                                    Recipient #{index + 1}
+                                  </div>
+                                  {isValidEmail(recipient.email) && (
+                                    <div className="flex items-center gap-1">
+                                      <BadgeCheck className="h-3.5 w-3.5 text-green-500" />
+                                      <span className="text-xs text-green-600 font-medium">
+                                        {recipient.name ? 'Complete' : 'Valid'}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {recipient.email && !isValidEmail(recipient.email) && (
+                                    <div className="flex items-center gap-1">
+                                      <AlertCircle className="h-3.5 w-3.5 text-red-500" />
+                                      <span className="text-xs text-red-600 font-medium">Invalid Email</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeRecipient(index)}
+                                  className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 h-auto transition-opacity duration-200"
+                                  title="Remove recipient"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+
+                              {/* Email Field */}
+                              <div className="space-y-2 mb-3">
+                                <div className="flex items-center gap-2">
+                                  <AtSign className="h-3.5 w-3.5 text-gray-500" />
+                                  <label className="text-xs font-medium text-gray-700">Email Address</label>
+                                  <span className="text-red-400 text-xs">*</span>
+                                </div>
+                                <Input
+                                  value={recipient.email}
+                                  onChange={(e) => updateRecipient(index, 'email', e.target.value)}
+                                  type="email"
+                                  placeholder="finance@company.com"
+                                  className={`text-sm transition-colors ${
+                                    !recipient.email 
+                                      ? 'border-gray-200 focus:border-blue-400 focus:ring-blue-100' 
+                                      : isValidEmail(recipient.email)
+                                        ? 'border-green-200 focus:border-green-400 focus:ring-green-100' 
+                                        : 'border-red-200 focus:border-red-400 focus:ring-red-100'
+                                  }`}
+                                />
+                                {recipient.email && !isValidEmail(recipient.email) && (
+                                  <div className="flex items-center gap-1 mt-1">
+                                    <AlertCircle className="h-3 w-3 text-red-500" />
+                                    <span className="text-xs text-red-600">Please enter a valid email address</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Name Field */}
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <User className="h-3.5 w-3.5 text-gray-500" />
+                                  <label className="text-xs font-medium text-gray-700">Display Name</label>
+                                  <span className="text-gray-400 text-xs">(optional)</span>
+                                </div>
+                                <Input
+                                  value={recipient.name}
+                                  onChange={(e) => updateRecipient(index, 'name', e.target.value)}
+                                  placeholder="Finance Team"
+                                  className="text-sm border-gray-200 focus:border-blue-400 focus:ring-blue-100"
+                                />
+                                {recipient.name && (
+                                  <div className="text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded">
+                                    Preview: "Dear {recipient.name}, ..."
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Summary Footer */}
+                    {automatedReportsConfig.recipients.length > 0 && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <CheckCircle className="h-4 w-4 text-blue-600" />
+                          <span className="text-sm font-medium text-blue-900">
+                            Report Distribution Summary
+                          </span>
+                        </div>
+                        <div className="text-xs text-blue-700 space-y-1">
+                          <p>• <strong>{automatedReportsConfig.recipients.length}</strong> recipients configured</p>
+                          <p>• <strong>{automatedReportsConfig.recipients.filter(r => isValidEmail(r.email)).length}</strong> valid email addresses</p>
+                          <p>• <strong>{automatedReportsConfig.recipients.filter(r => r.name).length}</strong> recipients with display names</p>
+                          <p>• <strong>{automatedReportsConfig.cc_recipients.length}</strong> CC recipients configured</p>
+                          <p>• <strong>Single consolidated email</strong> sent to all recipients</p>
+                          <p>• Reports include CSV and PDF attachments</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* CC Recipients Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <AtSign className="h-4 w-4 text-purple-600" />
+                        <label className="text-sm font-medium text-gray-900">CC Recipients</label>
+                        <span className="bg-purple-100 text-purple-800 text-xs px-2 py-0.5 rounded-full font-medium">
+                          {automatedReportsConfig.cc_recipients.length}
+                        </span>
+                        <span className="text-xs text-gray-500">(optional)</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={addCCRecipient}
+                          className="text-xs px-3 py-2 flex items-center gap-1.5 hover:bg-purple-50 hover:text-purple-700 hover:border-purple-300 transition-colors"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          Add One
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={addBulkCCRecipients}
+                          className="text-xs px-3 py-2 flex items-center gap-1.5 hover:bg-purple-50 hover:text-purple-700 hover:border-purple-300 transition-colors"
+                        >
+                          <AtSign className="h-3.5 w-3.5" />
+                          Add Multiple
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {automatedReportsConfig.cc_recipients.length === 0 ? (
+                        <div className="text-center py-6 bg-purple-50 rounded-lg border-2 border-dashed border-purple-200">
+                          <AtSign className="h-10 w-10 text-purple-400 mx-auto mb-2" />
+                          <p className="text-sm text-purple-600 mb-1">No CC recipients</p>
+                          <p className="text-xs text-purple-400 mb-3">CC recipients will receive copies of all daily reports in a single consolidated email</p>
+                          <div className="flex gap-2 justify-center">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={addCCRecipient}
+                              className="text-xs px-4 py-2 flex items-center gap-2"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              Add CC Recipient
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="max-h-48 overflow-y-auto pr-2 space-y-3">
+                          {automatedReportsConfig.cc_recipients.map((ccRecipient, index) => (
+                            <div 
+                              key={index} 
+                              className="group relative bg-purple-50 border border-purple-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200"
+                            >
+                              {/* CC Recipient Header */}
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="p-2 bg-purple-100 rounded-lg">
+                                    <AtSign className="h-4 w-4 text-purple-600" />
+                                  </div>
+                                  <div className="text-sm font-medium text-purple-900">
+                                    CC Recipient #{index + 1}
+                                  </div>
+                                  {isValidEmail(ccRecipient.email) && (
+                                    <div className="flex items-center gap-1">
+                                      <BadgeCheck className="h-3.5 w-3.5 text-green-500" />
+                                      <span className="text-xs text-green-600 font-medium">
+                                        {ccRecipient.name ? 'Complete' : 'Valid'}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {ccRecipient.email && !isValidEmail(ccRecipient.email) && (
+                                    <div className="flex items-center gap-1">
+                                      <AlertCircle className="h-3.5 w-3.5 text-red-500" />
+                                      <span className="text-xs text-red-600 font-medium">Invalid Email</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeCCRecipient(index)}
+                                  className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 h-auto transition-opacity duration-200"
+                                  title="Remove CC recipient"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+
+                              {/* Email Field */}
+                              <div className="space-y-2 mb-3">
+                                <div className="flex items-center gap-2">
+                                  <AtSign className="h-3.5 w-3.5 text-gray-500" />
+                                  <label className="text-xs font-medium text-gray-700">Email Address</label>
+                                  <span className="text-red-400 text-xs">*</span>
+                                </div>
+                                <Input
+                                  value={ccRecipient.email}
+                                  onChange={(e) => updateCCRecipient(index, 'email', e.target.value)}
+                                  type="email"
+                                  placeholder="manager@company.com"
+                                  className={`text-sm transition-colors ${
+                                    !ccRecipient.email 
+                                      ? 'border-gray-200 focus:border-purple-400 focus:ring-purple-100' 
+                                      : isValidEmail(ccRecipient.email)
+                                        ? 'border-green-200 focus:border-green-400 focus:ring-green-100' 
+                                        : 'border-red-200 focus:border-red-400 focus:ring-red-100'
+                                  }`}
+                                />
+                                {ccRecipient.email && !isValidEmail(ccRecipient.email) && (
+                                  <div className="flex items-center gap-1 mt-1">
+                                    <AlertCircle className="h-3 w-3 text-red-500" />
+                                    <span className="text-xs text-red-600">Please enter a valid email address</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Name Field */}
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <User className="h-3.5 w-3.5 text-gray-500" />
+                                  <label className="text-xs font-medium text-gray-700">Display Name</label>
+                                  <span className="text-gray-400 text-xs">(optional)</span>
+                                </div>
+                                <Input
+                                  value={ccRecipient.name}
+                                  onChange={(e) => updateCCRecipient(index, 'name', e.target.value)}
+                                  placeholder="Manager"
+                                  className="text-sm border-gray-200 focus:border-purple-400 focus:ring-purple-100"
+                                />
+                                {ccRecipient.name && (
+                                  <div className="text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded">
+                                    Preview: "CC: {ccRecipient.name} &lt;{ccRecipient.email}&gt;"
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-2">
