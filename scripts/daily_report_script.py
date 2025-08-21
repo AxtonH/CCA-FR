@@ -442,7 +442,7 @@ def generate_daily_report(connector):
 
 def generate_html_email_template(recipient_name, report_data):
     """Generate professional HTML email template"""
-    greeting = recipient_name if recipient_name else "Finance Team"
+    greeting = recipient_name if recipient_name else "Team"
     date_str = datetime.now().strftime('%B %d, %Y')
     
     # Generate top clients table HTML
@@ -775,10 +775,10 @@ def send_daily_report_email(config, report_data):
             subject = f"Daily Invoice Follow-Up Report - {datetime.now().strftime('%Y-%m-%d')}"
             
             # Use generic greeting for consolidated email
-            html_body = generate_html_email_template("Finance Team", report_data)
+            html_body = generate_html_email_template("Team", report_data)
             
             # Create plain text fallback
-            plain_text_body = f"""Dear Finance Team,
+            plain_text_body = f"""Dear Team,
 
 Please find attached the daily invoice follow-up report for {datetime.now().strftime('%Y-%m-%d')}.
 
