@@ -141,9 +141,9 @@ function authReducer(state, action) {
 export function AuthProvider({ children }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  // Load connection state and settings from localStorage on mount
+  // Load connection state (session) and settings (persistent) on mount
   useEffect(() => {
-    const savedState = localStorage.getItem('odooConnectionState');
+    const savedState = sessionStorage.getItem('odooConnectionState');
     const savedSettings = localStorage.getItem('appSettings');
     
     if (savedState) {
@@ -173,12 +173,12 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Save connection state to localStorage when it changes
+  // Save connection state to sessionStorage when it changes
   useEffect(() => {
     if (state.isConnected) {
-      localStorage.setItem('odooConnectionState', JSON.stringify(state));
+      sessionStorage.setItem('odooConnectionState', JSON.stringify(state));
     } else {
-      localStorage.removeItem('odooConnectionState');
+      sessionStorage.removeItem('odooConnectionState');
     }
   }, [state.isConnected, state.connectionDetails, state.overdueInvoices]);
 
@@ -283,7 +283,52 @@ export function AuthProvider({ children }) {
     
     // Always dispatch disconnect to clear frontend state
     dispatch({ type: 'DISCONNECT' });
+    sessionStorage.removeItem('odooConnectionState');
   };
+
+  // Auto-disconnect on tab close using sendBeacon/keepalive
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (!state.connectionId) return;
+      try {
+        const payload = JSON.stringify({ connectionId: state.connectionId });
+        const blob = new Blob([payload], { type: 'application/json' });
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon('/api/odoo/disconnect', blob);
+        } else {
+          // Fallback best-effort
+          fetch('/api/odoo/disconnect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload,
+            keepalive: true,
+          }).catch(() => {});
+        }
+      } catch (_) {}
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [state.connectionId]);
+
+  // Inactivity timeout based on settings.security.sessionTimeout (minutes)
+  useEffect(() => {
+    if (!state.isConnected) return;
+    let timeoutId;
+    const minutes = state.settings?.security?.sessionTimeout || 60;
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        disconnect();
+      }, minutes * 60 * 1000);
+    };
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    events.forEach(evt => window.addEventListener(evt, resetTimer));
+    resetTimer();
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      events.forEach(evt => window.removeEventListener(evt, resetTimer));
+    };
+  }, [state.isConnected, state.settings?.security?.sessionTimeout]);
 
   const refreshInvoices = async () => {
     if (!state.isConnected) return;
