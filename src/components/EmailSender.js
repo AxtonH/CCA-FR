@@ -36,12 +36,48 @@ const EmailSender = () => {
     ccList: settings.emailConfig.ccList || '',
     enablePdfAttachment: true,
   });
+  const [clientThreadInfo, setClientThreadInfo] = useState({});
   const [isSending, setIsSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedEmails, setExpandedEmails] = useState({});
   const [emailSearchQuery, setEmailSearchQuery] = useState('');
   const [sendResults, setSendResults] = useState(null);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+
+  // Fetch thread information for selected clients
+  const fetchClientThreadInfo = async (clients) => {
+    try {
+      const clientData = clients.map(clientName => {
+        const invoices = clientInvoices[clientName];
+        return {
+          client_name: clientName,
+          client_email: invoices[0]?.client_email || '',
+          company_name: invoices[0]?.company_name || ''
+        };
+      });
+      
+      console.log('Fetching thread info for clients:', clientData);
+      
+      const response = await fetch('/api/email/thread-info', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clients: clientData
+        }),
+      });
+
+      const data = await response.json();
+      console.log('Thread info response:', data);
+      if (data.success) {
+        console.log('Setting client thread info:', data.thread_info);
+        setClientThreadInfo(data.thread_info);
+      }
+    } catch (error) {
+      console.error('Error fetching thread info:', error);
+    }
+  };
 
   // Group invoices by client
   const clientInvoices = useMemo(() => {
@@ -99,23 +135,44 @@ const EmailSender = () => {
   }, [selectedClients, emailSearchQuery, clientInvoices]);
 
   const handleClientToggle = (clientName) => {
-    setSelectedClients(prev => 
-      prev.includes(clientName) 
+    setSelectedClients(prev => {
+      const newSelection = prev.includes(clientName) 
         ? prev.filter(name => name !== clientName)
-        : [...prev, clientName]
-    );
+        : [...prev, clientName];
+      
+      // Fetch thread info for the new selection
+      if (newSelection.length > 0) {
+        fetchClientThreadInfo(newSelection);
+      } else {
+        setClientThreadInfo({});
+      }
+      
+      return newSelection;
+    });
   };
 
   const handleSelectAll = (clientList) => {
     setSelectedClients(clientList);
+    if (clientList.length > 0) {
+      fetchClientThreadInfo(clientList);
+    }
   };
 
   const handleDeselectAll = (clientList) => {
-    setSelectedClients(prev => prev.filter(client => !clientList.includes(client)));
+    setSelectedClients(prev => {
+      const newSelection = prev.filter(client => !clientList.includes(client));
+      if (newSelection.length > 0) {
+        fetchClientThreadInfo(newSelection);
+      } else {
+        setClientThreadInfo({});
+      }
+      return newSelection;
+    });
   };
 
   const handleClearSelection = () => {
     setSelectedClients([]);
+    setClientThreadInfo({});
   };
 
   const toggleEmailExpansion = (clientName) => {
@@ -165,8 +222,43 @@ const EmailSender = () => {
     }
   };
 
-  const handleNextStep = () => {
+  const handleNextStep = async () => {
     if (currentStep === 1 && selectedClients.length > 0) {
+      // Fetch thread info for all selected clients
+      const clientData = selectedClients.map(clientName => {
+        const invoices = clientInvoices[clientName];
+        const clientData = {
+          client_name: clientName,
+          client_email: invoices[0]?.client_email || '',
+          company_name: invoices[0]?.company_name || ''
+        };
+        console.log(`Client data for ${clientName}:`, clientData);
+        return clientData;
+      });
+      
+      console.log('Fetching thread info for step 2:', clientData);
+      
+      let threadInfoMap = {};
+      try {
+        const response = await fetch('/api/email/thread-info', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            clients: clientData
+          }),
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+          threadInfoMap = data.thread_info;
+          console.log('Thread info for step 2:', threadInfoMap);
+        }
+      } catch (error) {
+        console.error('Error fetching thread info for step 2:', error);
+      }
+      
       // Initialize email configs for selected clients
       const initialConfigs = {};
       selectedClients.forEach(clientName => {
@@ -174,13 +266,10 @@ const EmailSender = () => {
         const totalAmount = invoices.reduce((sum, inv) => sum + inv.amount_due, 0);
         const maxDays = Math.max(...invoices.map(inv => inv.days_overdue));
         
-        // Automatically select template based on overdue severity
-        let templateType = 'initial';
-        if (maxDays > 30) {
-          templateType = 'final';
-        } else if (maxDays > 15) {
-          templateType = 'second';
-        }
+        // Use automatic template selection based on message count
+        const threadInfo = threadInfoMap[clientName];
+        const templateType = threadInfo?.template_type || 'initial';
+        console.log(`Template selection for ${clientName}:`, { threadInfo, templateType });
         
         const template = generateEmailBody(clientName, invoices, totalAmount, maxDays, templateType);
         
@@ -270,10 +359,7 @@ const EmailSender = () => {
     switch (templateType) {
       case 'second':
         template = {
-          subject: `Invoice notice - outstanding balance of ${displayCurrency === 'ORIGINAL' 
-            ? formatCurrencyAmount(convertedTotalAmount, displayCurrency, invoices[0]?.currency_symbol || 'AED')
-            : formatCurrencyAmount(convertedTotalAmount, displayCurrency)
-          }`,
+          subject: `Pl | Out Standing Payments | ${invoices[0]?.company_name || 'Company'}`,
           body: `Dear ${clientName},
 
 I hope you're doing well.
@@ -296,10 +382,7 @@ please dismiss this email if you have already made the payment`
         break;
       case 'final':
         template = {
-          subject: `Invoice notice - outstanding balance of ${displayCurrency === 'ORIGINAL' 
-            ? formatCurrencyAmount(convertedTotalAmount, displayCurrency, invoices[0]?.currency_symbol || 'AED')
-            : formatCurrencyAmount(convertedTotalAmount, displayCurrency)
-          }`,
+          subject: `Pl | Out Standing Payments | ${invoices[0]?.company_name || 'Company'}`,
           body: `Dear ${clientName},
 
 This is our final reminder regarding the outstanding balance of ${displayCurrency === 'ORIGINAL' 
@@ -322,10 +405,7 @@ please dismiss this email if you have already made the payment`
         break;
       default: // initial
         template = {
-          subject: `Invoice notice - outstanding balance of ${displayCurrency === 'ORIGINAL' 
-            ? formatCurrencyAmount(convertedTotalAmount, displayCurrency, invoices[0]?.currency_symbol || 'AED')
-            : formatCurrencyAmount(convertedTotalAmount, displayCurrency)
-          }`,
+          subject: `Pl | Out Standing Payments | ${invoices[0]?.company_name || 'Company'}`,
           body: `Dear ${clientName},
 
 I hope this message finds you well.
@@ -612,34 +692,34 @@ please dismiss this email if you have already made the payment`
             </div>
 
             <div className="space-y-6">
-              {/* Recent Clients */}
-              {groupedClients.recent.length > 0 && (
+              {/* Severe Clients */}
+              {groupedClients.severe.length > 0 && (
                 <div>
                                   <div className="flex items-center justify-between mb-3">
                   <h4 className="text-sm font-medium text-gray-900 flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-success-600" />
-                    Recent (≤ 15 days)
-                    <Badge variant="success">{groupedClients.recent.length}</Badge>
+                    <AlertTriangle className="h-4 w-4 text-danger-600" />
+                    Severe (31+ days)
+                    <Badge variant="danger">{groupedClients.severe.length}</Badge>
                   </h4>
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleSelectAll(groupedClients.recent)}
+                      onClick={() => handleSelectAll(groupedClients.severe)}
                     >
                       Select All
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDeselectAll(groupedClients.recent)}
+                      onClick={() => handleDeselectAll(groupedClients.severe)}
                     >
                       Deselect All
                     </Button>
                   </div>
                 </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {groupedClients.recent.map(clientName => {
+                    {groupedClients.severe.map(clientName => {
                       const stats = getClientStats(clientName);
                       return (
                         <div
@@ -742,34 +822,34 @@ please dismiss this email if you have already made the payment`
                 </div>
               )}
 
-              {/* Severe Clients */}
-              {groupedClients.severe.length > 0 && (
+              {/* Recent Clients */}
+              {groupedClients.recent.length > 0 && (
                 <div>
                                   <div className="flex items-center justify-between mb-3">
                   <h4 className="text-sm font-medium text-gray-900 flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-danger-600" />
-                    Severe (31+ days)
-                    <Badge variant="danger">{groupedClients.severe.length}</Badge>
+                    <Clock className="h-4 w-4 text-success-600" />
+                    Recent (≤ 15 days)
+                    <Badge variant="success">{groupedClients.recent.length}</Badge>
                   </h4>
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleSelectAll(groupedClients.severe)}
+                      onClick={() => handleSelectAll(groupedClients.recent)}
                     >
                       Select All
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDeselectAll(groupedClients.severe)}
+                      onClick={() => handleDeselectAll(groupedClients.recent)}
                     >
                       Deselect All
                     </Button>
                   </div>
                 </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {groupedClients.severe.map(clientName => {
+                    {groupedClients.recent.map(clientName => {
                       const stats = getClientStats(clientName);
                       return (
                         <div
@@ -879,11 +959,46 @@ please dismiss this email if you have already made the payment`
                 <label className="text-sm font-medium">Override Template (Optional)</label>
                 <Select
                   value={globalEmailConfig.template}
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     setGlobalEmailConfig(prev => ({
                       ...prev,
                       template: e.target.value
                     }));
+                    
+                    // If auto mode, fetch fresh thread info
+                    let threadInfoMap = clientThreadInfo;
+                    if (e.target.value === 'auto') {
+                      const clientData = selectedClients.map(clientName => {
+                        const invoices = clientInvoices[clientName];
+                        const clientData = {
+                          client_name: clientName,
+                          client_email: invoices[0]?.client_email || '',
+                          company_name: invoices[0]?.company_name || ''
+                        };
+                        console.log(`Global template - Client data for ${clientName}:`, clientData);
+                        return clientData;
+                      });
+                      
+                      try {
+                        const response = await fetch('/api/email/thread-info', {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({
+                            clients: clientData
+                          }),
+                        });
+                        
+                        const data = await response.json();
+                        if (data.success) {
+                          threadInfoMap = data.thread_info;
+                        }
+                      } catch (error) {
+                        console.error('Error fetching thread info for global template:', error);
+                      }
+                    }
+                    
                     // Regenerate email configs with new template
                     const updatedConfigs = {};
                     selectedClients.forEach(clientName => {
@@ -894,14 +1009,10 @@ please dismiss this email if you have already made the payment`
                       // Determine template type based on selection
                       let templateType = e.target.value;
                       if (e.target.value === 'auto') {
-                        // Auto-select based on overdue severity
-                        if (maxDays > 30) {
-                          templateType = 'final';
-                        } else if (maxDays > 15) {
-                          templateType = 'second';
-                        } else {
-                          templateType = 'initial';
-                        }
+                        // Auto-select based on message count
+                        const threadInfo = threadInfoMap[clientName];
+                        templateType = threadInfo?.template_type || 'initial';
+                        console.log(`Global template selection for ${clientName}:`, { threadInfo, templateType });
                       }
                       
                       const template = generateEmailBody(clientName, invoices, totalAmount, maxDays, templateType);
@@ -919,13 +1030,13 @@ please dismiss this email if you have already made the payment`
                     setEmailConfigs(updatedConfigs);
                   }}
                 >
-                  <SelectOption value="auto">Auto-select based on overdue days</SelectOption>
+                  <SelectOption value="auto">Auto-select based on email history</SelectOption>
                   <SelectOption value="initial">Initial Reminder</SelectOption>
                   <SelectOption value="second">Second Reminder</SelectOption>
                   <SelectOption value="final">Final Reminder</SelectOption>
                 </Select>
                 <p className="text-xs text-gray-500">
-                  Leave as "Auto-select" to use severity-based templates, or override for all clients
+                  Auto-select chooses template based on how many times each client has been emailed before
                 </p>
               </div>
 
@@ -1084,7 +1195,9 @@ please dismiss this email if you have already made the payment`
                          config.templateType === 'second' ? 'Second Reminder' : 'Initial Reminder'}
                       </Badge>
                       {globalEmailConfig.template === 'auto' && (
-                        <span className="text-xs text-gray-400">(Auto-selected)</span>
+                        <span className="text-xs text-gray-400">
+                          (Auto-selected{clientThreadInfo[clientName]?.message_count > 0 ? ` • ${clientThreadInfo[clientName].message_count} emails sent` : ''})
+                        </span>
                       )}
                     </div>
                   </div>
@@ -1280,6 +1393,20 @@ please dismiss this email if you have already made the payment`
                           <p className="text-sm text-gray-600">
                             {stats.invoiceCount} invoice(s) • {stats.formattedAmount}
                           </p>
+                          {clientThreadInfo[clientName] && (
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant={
+                                clientThreadInfo[clientName].template_type === 'initial' ? 'success' :
+                                clientThreadInfo[clientName].template_type === 'second' ? 'warning' : 'danger'
+                              }>
+                                {clientThreadInfo[clientName].template_type === 'initial' ? 'Initial' :
+                                 clientThreadInfo[clientName].template_type === 'second' ? 'Second' : 'Final'} Reminder
+                              </Badge>
+                              <span className="text-xs text-gray-500">
+                                ({clientThreadInfo[clientName].message_count} previous emails)
+                              </span>
+                            </div>
+                          )}
                         </div>
                         <Badge variant="default">{index + 1}</Badge>
                       </div>
@@ -1297,6 +1424,11 @@ please dismiss this email if you have already made the payment`
                              {config.templateType === 'final' ? 'Final Reminder' :
                               config.templateType === 'second' ? 'Second Reminder' : 'Initial Reminder'}
                            </Badge>
+                           {clientThreadInfo[clientName]?.message_count > 0 && (
+                             <span className="text-xs text-gray-500 ml-2">
+                               ({clientThreadInfo[clientName].message_count} emails sent)
+                             </span>
+                           )}
                          </div>
                          <div>
                            <span className="font-medium">Subject:</span> {config.subject}

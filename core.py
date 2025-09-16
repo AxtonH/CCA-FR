@@ -63,7 +63,32 @@ class EmailThreadManager:
     
     def get_thread_id(self, client_name, client_email, company_name=None):
         """Get or create a thread ID for a specific client"""
-        # Create a unique key for this client
+        # First, try to find existing thread using flexible matching
+        existing_thread = self.get_thread_info(client_name, client_email, company_name)
+        if existing_thread:
+            # Found existing thread, use its key and increment message count
+            # Check if email is missing or is a placeholder
+            is_placeholder_email = (not client_email or 
+                                  client_email == 'client@company.com' or 
+                                  client_email.strip() == '')
+            
+            if is_placeholder_email:
+                # Search by client name only
+                for key, thread_info in self.threads.items():
+                    if thread_info.get('client_name') == client_name:
+                        self.threads[key]['message_count'] += 1
+                        self._save_threads()
+                        return thread_info['thread_id']
+            else:
+                # Search by both name and email
+                for key, thread_info in self.threads.items():
+                    if (thread_info.get('client_name') == client_name and 
+                        thread_info.get('client_email') == client_email):
+                        self.threads[key]['message_count'] += 1
+                        self._save_threads()
+                        return thread_info['thread_id']
+        
+        # No existing thread found, create new one
         client_key = f"{client_name}_{client_email}_{company_name or 'default'}"
         
         # Generate a hash for consistent thread ID
@@ -80,29 +105,56 @@ class EmailThreadManager:
         
         sanitized_company = sanitize_company_name(company_name)
         
-        if client_key not in self.threads:
-            # Create new thread
-            thread_id = f"<{thread_hash}@{sanitized_company}.com>"
-            self.threads[client_key] = {
-                'thread_id': thread_id,
-                'client_name': client_name,
-                'client_email': client_email,
-                'company_name': company_name,
-                'created_date': datetime.now().isoformat(),
-                'message_count': 0
-            }
-            self._save_threads()
-        else:
-            # Update message count
-            self.threads[client_key]['message_count'] += 1
-            self._save_threads()
+        # Create new thread
+        thread_id = f"<{thread_hash}@{sanitized_company}.com>"
+        self.threads[client_key] = {
+            'thread_id': thread_id,
+            'client_name': client_name,
+            'client_email': client_email,
+            'company_name': company_name,
+            'created_date': datetime.now().isoformat(),
+            'message_count': 0
+        }
+        self._save_threads()
         
         return self.threads[client_key]['thread_id']
     
     def get_thread_info(self, client_name, client_email, company_name=None):
         """Get thread information for a client"""
-        client_key = f"{client_name}_{client_email}_{company_name or 'default'}"
-        return self.threads.get(client_key, {})
+        # Check if email is missing or is a placeholder
+        is_placeholder_email = (not client_email or 
+                              client_email == 'client@company.com' or 
+                              client_email.strip() == '')
+        
+        if is_placeholder_email:
+            print(f"🔍 Email is missing/placeholder for {client_name}, searching by name only")
+            # Search by client name only, regardless of email
+            for key, thread_info in self.threads.items():
+                if thread_info.get('client_name') == client_name:
+                    print(f"🔍 Found matching thread by name only: {key}")
+                    return thread_info
+        else:
+            # Try exact match first
+            client_key = f"{client_name}_{client_email}_{company_name or 'default'}"
+            if client_key in self.threads:
+                return self.threads[client_key]
+            
+            # Try with 'default' company if company_name was provided
+            if company_name:
+                client_key_default = f"{client_name}_{client_email}_default"
+                if client_key_default in self.threads:
+                    return self.threads[client_key_default]
+            
+            # Try to find any thread with matching client_name and client_email
+            for key, thread_info in self.threads.items():
+                if (thread_info.get('client_name') == client_name and 
+                    thread_info.get('client_email') == client_email):
+                    print(f"🔍 Found matching thread by name/email: {key}")
+                    return thread_info
+        
+        # Return empty dict if no match found
+        print(f"🔍 No thread found for: {client_name}, {client_email}, {company_name}")
+        return {}
     
     def update_thread_subject(self, client_name, client_email, subject, company_name=None):
         """Update the subject line for a thread to maintain context"""
@@ -368,9 +420,9 @@ class OdooConnector:
                 
                 # Get currency from cache
                 currency_id = invoice.get('currency_id', [None])[0] if invoice.get('currency_id') else None
-                currency_symbol = '$'  # Default fallback
+                currency_symbol = 'USD'  # Default fallback
                 if currency_id and currency_id in currencies_cache:
-                    currency_symbol = currencies_cache[currency_id].get('symbol', '$')
+                    currency_symbol = currencies_cache[currency_id].get('name', 'USD')
                 
                 # Get company name from company_id (from Odoo API)
                 company_name = 'Unknown Company'
@@ -659,11 +711,11 @@ class OdooConnector:
             
             if result.get('result') and result['result']:
                 return result['result'][0]
-            return {'name': 'USD', 'symbol': '$'}
+            return {'name': 'USD', 'symbol': 'USD'}
             
         except Exception as e:
             print(f"Error fetching currency: {str(e)}")
-            return {'name': 'USD', 'symbol': '$'}
+            return {'name': 'USD', 'symbol': 'USD'}
 
     def _get_company(self, company_id):
         """Get company details"""
@@ -888,8 +940,11 @@ def generate_email_template(client_name, invoices, days_overdue, template_type="
     """Generate email template for a client"""
     total_amount = sum(invoice['amount_residual'] for invoice in invoices)
     
+    # Get company name from the first invoice
+    company_name = invoices[0].get('company_name', 'Company') if invoices else 'Company'
+    
     # Use consistent subject line for all template types to enable proper threading
-    subject = f"Invoice notice - outstanding balance of ${total_amount:,.2f}"
+    subject = f"Pl | Out Standing Payments | {company_name}"
     disclaimer = "please dismiss this email if you have already made the payment"
 
     if template_type == "initial":
@@ -898,7 +953,7 @@ Dear {client_name},
 
 We hope this email finds you well. We would like to bring to your attention that you have {len(invoices)} invoice(s) that are currently overdue for payment.
 
-Total Outstanding Amount: ${total_amount:,.2f}
+Total Outstanding Amount: {total_amount:,.2f} {invoices[0].get('currency_symbol', 'USD') if invoices else 'USD'}
 Days Overdue: {days_overdue}
 
 Please arrange for payment at your earliest convenience. If you have any questions or concerns, please don't hesitate to contact us.
@@ -914,7 +969,7 @@ Dear {client_name},
 
 This is our second reminder regarding your overdue invoice(s). We have not yet received payment for the following:
 
-Total Outstanding Amount: ${total_amount:,.2f}
+Total Outstanding Amount: {total_amount:,.2f} {invoices[0].get('currency_symbol', 'USD') if invoices else 'USD'}
 Days Overdue: {days_overdue}
 
 Please note that continued non-payment may result in additional charges or suspension of services.
@@ -930,7 +985,7 @@ Dear {client_name},
 
 This is our final notice regarding your overdue invoice(s). Payment is now urgently required:
 
-Total Outstanding Amount: ${total_amount:,.2f}
+Total Outstanding Amount: {total_amount:,.2f} {invoices[0].get('currency_symbol', 'USD') if invoices else 'USD'}
 Days Overdue: {days_overdue}
 
 Failure to make immediate payment may result in:

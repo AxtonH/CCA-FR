@@ -32,19 +32,7 @@ import {
 
 // Helper function to get currency symbol
 const getCurrencySymbol = (currencyCode) => {
-  const symbols = {
-    'AED': 'د.إ',
-    'USD': '$',
-    'EUR': '€',
-    'GBP': '£',
-    'SAR': 'ر.س',
-    'KWD': 'د.ك',
-    'BHD': 'د.ب',
-    'QAR': 'ر.ق',
-    'OMR': 'ر.ع',
-    'JOD': 'د.أ'
-  };
-  return symbols[currencyCode] || currencyCode;
+  return currencyCode;
 };
 
 // Helper function to get exchange rate
@@ -114,10 +102,11 @@ const SettingsPage = () => {
     enabled: false,
     recipient_email: '', // Kept for backward compatibility
     recipients: [], // New multi-recipient structure: [{email: "...", name: "..."}, ...]
-    cc_recipients: [], // CC recipients for daily reports: [{email: "...", name: "..."}, ...]
+    cc_recipients: [], // CC recipients for weekly reports: [{email: "...", name: "..."}, ...]
     report_time: '09:00',
-    check_interval: 'hourly',
-    email_template: 'daily_summary',
+    report_day: 'monday',
+    check_interval: 'weekly',
+    email_template: 'weekly_summary',
     odoo_connection: {
       url: '',
       database: '',
@@ -273,8 +262,9 @@ const SettingsPage = () => {
           enabled: automatedReportsConfig.enabled,
           recipient_email: automatedReportsConfig.recipient_email, // Keep for backward compatibility
           recipients: automatedReportsConfig.recipients, // New multi-recipient structure
-          cc_recipients: automatedReportsConfig.cc_recipients, // CC recipients for daily reports
+          cc_recipients: automatedReportsConfig.cc_recipients, // CC recipients for weekly reports
           report_time: automatedReportsConfig.report_time,
+          report_day: automatedReportsConfig.report_day,
           check_interval: automatedReportsConfig.check_interval,
           email_template: automatedReportsConfig.email_template,
           odoo_connection: automatedReportsConfig.odoo_connection,
@@ -1476,10 +1466,10 @@ END OF REPORT
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <RefreshCw className="h-5 w-5" />
-                Automated Daily Reports
+                Automated Weekly Reports
               </CardTitle>
               <CardDescription>
-                Configure automated daily reports sent via email
+                Configure automated weekly reports sent via email
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 flex-1">
@@ -1521,6 +1511,7 @@ END OF REPORT
                         </div>
                       )}
                       <p>• Time: {automatedReportsConfig.report_time}</p>
+                      <p>• Day: {automatedReportsConfig.report_day?.charAt(0).toUpperCase() + automatedReportsConfig.report_day?.slice(1)}</p>
                       <p>• Schedule: {automatedReportsConfig.check_interval}</p>
                     </div>
                   )}
@@ -1530,7 +1521,7 @@ END OF REPORT
                     </div>
                   )}
                   <div className="text-xs text-blue-600 mt-2">
-                    💡 Set up Windows Task Scheduler to run scripts/daily_report.bat hourly
+                    💡 Set up Windows Task Scheduler to run scripts/weekly_report.bat weekly
                   </div>
                 </div>
               ) : (
@@ -1544,7 +1535,7 @@ END OF REPORT
                         onChange={(e) => setAutomatedReportsConfig(prev => ({ ...prev, enabled: e.target.checked }))}
                         className="rounded"
                       />
-                      <span className="text-sm text-gray-600">Send daily reports automatically</span>
+                      <span className="text-sm text-gray-600">Send weekly reports automatically</span>
                     </div>
                   </div>
 
@@ -1584,7 +1575,7 @@ END OF REPORT
                         <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
                           <Users className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                           <p className="text-sm text-gray-500 mb-2">No recipients configured</p>
-                          <p className="text-xs text-gray-400 mb-4">Add recipients to receive automated daily reports</p>
+                          <p className="text-xs text-gray-400 mb-4">Add recipients to receive automated weekly reports</p>
                           <div className="flex gap-2 justify-center">
                             <Button
                               variant="outline"
@@ -1760,7 +1751,7 @@ END OF REPORT
                         <div className="text-center py-6 bg-purple-50 rounded-lg border-2 border-dashed border-purple-200">
                           <AtSign className="h-10 w-10 text-purple-400 mx-auto mb-2" />
                           <p className="text-sm text-purple-600 mb-1">No CC recipients</p>
-                          <p className="text-xs text-purple-400 mb-3">CC recipients will receive copies of all daily reports in a single consolidated email</p>
+                          <p className="text-xs text-purple-400 mb-3">CC recipients will receive copies of all weekly reports in a single consolidated email</p>
                           <div className="flex gap-2 justify-center">
                             <Button
                               variant="outline"
@@ -1876,6 +1867,26 @@ END OF REPORT
                       onChange={(e) => setAutomatedReportsConfig(prev => ({ ...prev, report_time: e.target.value }))}
                       type="time"
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Report Day</label>
+                    <select 
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                      value={automatedReportsConfig.report_day}
+                      onChange={(e) => setAutomatedReportsConfig(prev => ({ ...prev, report_day: e.target.value }))}
+                    >
+                      <option value="monday">Monday</option>
+                      <option value="tuesday">Tuesday</option>
+                      <option value="wednesday">Wednesday</option>
+                      <option value="thursday">Thursday</option>
+                      <option value="friday">Friday</option>
+                      <option value="saturday">Saturday</option>
+                      <option value="sunday">Sunday</option>
+                    </select>
+                    <div className="text-xs text-gray-500">
+                      Weekly reports will be sent on the selected day at the specified time
+                    </div>
                   </div>
 
                   <div className="space-y-2">

@@ -18,19 +18,7 @@ import { format } from 'date-fns';
 
 // Helper function to get currency symbol
 const getCurrencySymbol = (currencyCode) => {
-  const symbols = {
-    'AED': 'د.إ',
-    'USD': '$',
-    'EUR': '€',
-    'GBP': '£',
-    'SAR': 'ر.س',
-    'KWD': 'د.ك',
-    'BHD': 'د.ب',
-    'QAR': 'ر.ق',
-    'OMR': 'ر.ع',
-    'JOD': 'د.أ'
-  };
-  return symbols[currencyCode] || currencyCode;
+  return currencyCode;
 };
 
 const Dashboard = () => {
@@ -54,7 +42,24 @@ const Dashboard = () => {
   const stats = useMemo(() => {
     if (!overdueInvoices.length) return null;
 
-    const totalAmount = overdueInvoices.reduce((sum, inv) => sum + inv.amount_due, 0);
+    // Use the saved currency setting from context
+    const displayCurrency = settings.currency || 'AED';
+    
+    // For total amount calculation, always convert to AED regardless of display currency
+    // This ensures the total is meaningful even when individual invoices show in original currencies
+    const totalAmountInAED = overdueInvoices.reduce((sum, inv) => {
+      const sourceCurrency = inv.currency_symbol || 'AED';
+      const convertedAmount = convertCurrency(inv.amount_due, sourceCurrency, 'AED');
+      return sum + convertedAmount;
+    }, 0);
+    
+    // For individual invoice display, use the user's selected currency
+    const totalAmount = overdueInvoices.reduce((sum, inv) => {
+      const sourceCurrency = inv.currency_symbol || 'AED';
+      const convertedAmount = convertCurrency(inv.amount_due, sourceCurrency, displayCurrency);
+      return sum + convertedAmount;
+    }, 0);
+    
     const avgDaysOverdue = overdueInvoices.reduce((sum, inv) => sum + inv.days_overdue, 0) / overdueInvoices.length;
     const uniqueClients = new Set(overdueInvoices.map(inv => inv.client_name)).size;
     
@@ -68,16 +73,11 @@ const Dashboard = () => {
       mostCommonCurrency[a] > mostCommonCurrency[b] ? a : b
     );
 
-    // Use the saved currency setting from context
-    const displayCurrency = settings.currency || 'AED';
-    
-    // Convert the total amount to the display currency
-    const convertedAmount = convertCurrency(totalAmount, sourceCurrency, displayCurrency);
-
     return {
       totalInvoices: overdueInvoices.length,
       totalAmount,
-      displayAmount: convertedAmount,
+      totalAmountInAED, // Always in AED for meaningful total
+      displayAmount: displayCurrency === 'ORIGINAL' ? totalAmountInAED : totalAmount,
       avgDaysOverdue,
       uniqueClients,
       sourceCurrency,
@@ -214,7 +214,7 @@ const Dashboard = () => {
                 <p className="text-sm font-medium text-gray-600">Total Amount</p>
                 <p className="text-2xl font-bold text-gray-900">
                   {stats.isOriginalCurrency 
-                    ? `${getCurrencySymbol(stats.sourceCurrency)}${stats.displayAmount.toLocaleString()}`
+                    ? `${stats.displayAmount.toLocaleString()} AED`
                     : formatCurrencyAmount(stats.displayAmount, stats.displayCurrency)
                   }
                 </p>

@@ -328,13 +328,31 @@ def send_bulk_emails():
                     subject = client_email_config['subject']
                     body = client_email_config['body']
                 else:
+                    # Get thread info to determine template type based on message count
+                    thread_info = thread_manager.get_thread_info(client_name, client_email, company_name)
+                    message_count = thread_info.get('message_count', 0)
+                    
+                    # Determine template type based on message count
+                    # Note: message_count represents previous emails, so:
+                    # 0 previous emails = first email = initial template
+                    # 1 previous email = second email = second template  
+                    # 2+ previous emails = third+ email = final template
+                    if message_count == 0:
+                        template_type = 'initial'
+                    elif message_count == 1:
+                        template_type = 'second'
+                    else:  # message_count >= 2
+                        template_type = 'final'
+                    
+                    print(f"🔍 Client '{client_name}' has {message_count} previous messages, using '{template_type}' template")
+                    
                     # Generate email template
                     max_days = max(inv['days_overdue'] for inv in client_invoices_list)
                     template_result = generate_email_template(
                         client_name, 
                         client_invoices_list, 
                         max_days, 
-                        email_config.get('template', 'initial')
+                        template_type
                     )
                     subject = template_result['subject']
                     body = template_result['body']
@@ -901,6 +919,76 @@ def get_email_thread_info(client_key):
         
     except Exception as e:
         print(f"❌ Get thread info error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/email/thread-info', methods=['POST'])
+def get_client_thread_info():
+    """Get thread information for specific clients"""
+    try:
+        data = request.get_json()
+        clients = data.get('clients', [])  # Array of {client_name, client_email, company_name}
+        
+        thread_info_map = {}
+        
+        for client in clients:
+            client_name = client.get('client_name')
+            client_email = client.get('client_email')
+            company_name = client.get('company_name')
+            
+            print(f"🔍 Processing client: {client_name}, email: {client_email}, company: {company_name}")
+            
+            # Debug: Show what client key would be generated
+            client_key = f"{client_name}_{client_email}_{company_name or 'default'}"
+            print(f"🔍 Generated client key: {client_key}")
+            
+            # Debug: Show all existing thread keys
+            print(f"🔍 Existing thread keys: {list(thread_manager.threads.keys())}")
+            
+            if client_name:  # Only require client_name, email can be empty
+                thread_info = thread_manager.get_thread_info(client_name, client_email, company_name)
+                message_count = thread_info.get('message_count', 0)
+                
+                print(f"🔍 Thread info for {client_name}: {thread_info}")
+                print(f"🔍 Message count: {message_count}")
+                
+                # Determine template type based on message count
+                if message_count == 0:
+                    template_type = 'initial'
+                elif message_count == 1:
+                    template_type = 'second'
+                else:  # message_count >= 2
+                    template_type = 'final'
+                
+                print(f"🔍 Template type for {client_name}: {template_type}")
+                
+                thread_info_map[client_name] = {
+                    'message_count': message_count,
+                    'template_type': template_type,
+                    'thread_id': thread_info.get('thread_id', ''),
+                    'created_date': thread_info.get('created_date', ''),
+                    'last_subject': thread_info.get('last_subject', '')
+                }
+        
+        return jsonify({
+            'success': True,
+            'thread_info': thread_info_map
+        })
+        
+    except Exception as e:
+        print(f"❌ Error getting client thread info: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/email/debug-threads', methods=['GET'])
+def debug_all_threads():
+    """Debug endpoint to show all thread information"""
+    try:
+        return jsonify({
+            'success': True,
+            'threads': thread_manager.threads,
+            'thread_count': len(thread_manager.threads)
+        })
+    except Exception as e:
+        print(f"❌ Error debugging threads: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

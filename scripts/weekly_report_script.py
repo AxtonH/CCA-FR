@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Daily Report Script for Odoo Invoice Follow-Up Manager
+Weekly Report Script for Odoo Invoice Follow-Up Manager
 This script is designed to be run by Windows Task Scheduler.
 
 It will:
 1. Check if automated reports are enabled
-2. Check if it's time to send a report
+2. Check if it's time to send a weekly report
 3. Connect to Odoo and generate the report
 4. Send the report via email with PDF attachment
 5. Log the results
@@ -85,7 +85,7 @@ def generate_pdf_report(invoices, top_clients=None, severe_clients=None, moderat
         story = []
         
         # Title with emoji - enhanced
-        story.append(Paragraph("📊 DAILY INVOICE FOLLOW-UP REPORT", title_style))
+        story.append(Paragraph("📊 WEEKLY INVOICE FOLLOW-UP REPORT", title_style))
         story.append(Spacer(1, 15))
         
         # Date - enhanced formatting
@@ -320,10 +320,10 @@ def calculate_top_clients_to_follow_up(client_invoices):
     client_scores.sort(key=lambda x: x['priority_score'], reverse=True)
     return client_scores[:3]
 
-def generate_daily_report(connector):
+def generate_weekly_report(connector):
     """Generate the same report as the Settings page download button"""
     try:
-        log_message("Generating daily report...")
+        log_message("Generating weekly report...")
         
         # Get overdue invoices (same logic as Settings page)
         invoices = connector.get_overdue_invoices()
@@ -369,7 +369,7 @@ def generate_daily_report(connector):
         moderate_clients.sort(key=lambda x: x['totalAmount'], reverse=True)
         
         log_message(f"Debug: Calculated {len(severe_clients)} severe clients and {len(moderate_clients)} moderate clients")
-        log_message(f"Debug: First 3 severe clients in generate_daily_report: {severe_clients[:3] if severe_clients else 'None'}")
+        log_message(f"Debug: First 3 severe clients in generate_weekly_report: {severe_clients[:3] if severe_clients else 'None'}")
         
         # Calculate summary statistics
         total_invoices = len(invoices)
@@ -524,7 +524,7 @@ def generate_html_email_template(recipient_name, report_data):
             <div style="padding: 30px 30px 20px 30px;">
                 <h2 style="color: #1f2937; margin: 0 0 20px 0; font-size: 20px;">Dear {greeting},</h2>
                 <p style="color: #4b5563; margin: 0 0 25px 0; font-size: 16px;">
-                    Please find below your daily invoice follow-up report with key metrics and priority clients requiring immediate attention.
+                    Please find below your weekly invoice follow-up report with key metrics and priority clients requiring immediate attention.
                 </p>
             </div>
             
@@ -708,8 +708,8 @@ def send_consolidated_email(sender_email, sender_password, to_list, cc_list, sub
         log_message(f"❌ Error sending consolidated email: {str(e)}", "ERROR")
         return False
 
-def send_daily_report_email(config, report_data):
-    """Send the daily report via email with threading support"""
+def send_weekly_report_email(config, report_data):
+    """Send the weekly report via email with threading support"""
     try:
         import smtplib
         from email.mime.multipart import MIMEMultipart
@@ -731,7 +731,7 @@ def send_daily_report_email(config, report_data):
             if legacy_recipient and legacy_recipient.strip():
                 recipients = [{"email": legacy_recipient.strip(), "name": ""}]
             else:
-                log_message("No recipients configured for daily reports", "ERROR")
+                log_message("No recipients configured for weekly reports", "ERROR")
                 return False
         
         # Get CC recipients
@@ -765,7 +765,7 @@ def send_daily_report_email(config, report_data):
             log_message("No valid recipient email addresses found", "ERROR")
             return False
         
-        log_message(f"Sending single consolidated daily report to {len(to_list)} recipients with {len(cc_list)} CC recipients")
+        log_message(f"Sending single consolidated weekly report to {len(to_list)} recipients with {len(cc_list)} CC recipients")
         log_message(f"TO: {', '.join(to_list)}")
         if cc_list:
             log_message(f"CC: {', '.join(cc_list)}")
@@ -780,7 +780,7 @@ def send_daily_report_email(config, report_data):
             # Create plain text fallback
             plain_text_body = f"""Dear Team,
 
-Please find attached the daily invoice follow-up report for {datetime.now().strftime('%Y-%m-%d')}.
+Please find attached the weekly invoice follow-up report for {datetime.now().strftime('%Y-%m-%d')}.
 
 SUMMARY OVERVIEW
 - Total Overdue Invoices: {report_data['total_invoices']}
@@ -863,10 +863,10 @@ Invoice Follow-Up System
             )
             
             if success:
-                log_message(f"✅ Consolidated daily report sent successfully to {len(to_list)} recipients with {len(cc_list)} CC recipients")
+                log_message(f"✅ Consolidated weekly report sent successfully to {len(to_list)} recipients with {len(cc_list)} CC recipients")
                 return True
             else:
-                log_message(f"❌ Failed to send consolidated daily report", "ERROR")
+                log_message(f"❌ Failed to send consolidated weekly report", "ERROR")
                 return False
                 
         except Exception as e:
@@ -879,7 +879,7 @@ Invoice Follow-Up System
 
 def main():
     """Main function - entry point for the script"""
-    log_message("Starting daily report script...")
+    log_message("Starting weekly report script...")
     
     try:
         # Load configuration
@@ -891,12 +891,14 @@ def main():
             log_message("Automated reports are disabled", "INFO")
             return
         
-        # Check if it's time to send a report
-        if not config_manager.is_time_to_send_report():
-            log_message("Not time to send report yet", "INFO")
+        # Check if it's time to send a weekly report
+        if not config_manager.is_time_to_send_weekly_report():
+            report_day = config_manager.get("automated_reports.report_day", "monday")
+            report_time = config_manager.get("automated_reports.report_time", "09:00")
+            log_message(f"Not time to send weekly report yet. Scheduled for {report_day.title()} at {report_time}", "INFO")
             return
         
-        log_message("Time to send daily report!")
+        log_message("Time to send weekly report!")
         
         # Get Odoo connection details
         odoo_config = config['automated_reports']['odoo_connection']
@@ -921,19 +923,19 @@ def main():
         log_message("Connected to Odoo successfully")
         
         # Generate report
-        report_data = generate_daily_report(connector)
+        report_data = generate_weekly_report(connector)
         
         if not report_data:
             log_message("No report data to send", "WARNING")
             return
         
         # Send email
-        if send_daily_report_email(config, report_data):
-            # Mark report as sent
-            config_manager.mark_report_sent()
-            log_message("Daily report completed successfully", "SUCCESS")
+        if send_weekly_report_email(config, report_data):
+            # Mark weekly report as sent
+            config_manager.mark_weekly_report_sent()
+            log_message("Weekly report completed successfully", "SUCCESS")
         else:
-            log_message("Failed to send daily report", "ERROR")
+            log_message("Failed to send weekly report", "ERROR")
         
     except Exception as e:
         log_message(f"Unexpected error in main function: {str(e)}", "ERROR")

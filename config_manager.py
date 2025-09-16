@@ -37,10 +37,11 @@ class ConfigManager:
                 "enabled": False,
                 "recipient_email": "",  # Deprecated - kept for backward compatibility
                 "recipients": [],  # New multi-recipient structure
-                "cc_recipients": [],  # CC recipients for daily reports
+                "cc_recipients": [],  # CC recipients for weekly reports
                 "report_time": "09:00",
-                "check_interval": "hourly",
-                "email_template": "daily_summary",
+                "report_day": "monday",
+                "check_interval": "weekly",
+                "email_template": "weekly_summary",
                 "last_sent": None,
                 "odoo_connection": {
                     "url": "",
@@ -177,10 +178,43 @@ class ConfigManager:
         
         return False
     
+    def is_time_to_send_weekly_report(self):
+        """Check if it's time to send the weekly report"""
+        if not self.get("automated_reports.enabled", False):
+            return False
+        
+        report_time = self.get("automated_reports.report_time", "09:00")
+        report_day = self.get("automated_reports.report_day", "monday")
+        current_time = datetime.now().strftime("%H:%M")
+        current_day = datetime.now().strftime("%A").lower()
+        
+        # Check if current time matches report time and current day matches report day
+        if current_time == report_time and current_day == report_day:
+            # Check if we already sent this week
+            last_sent = self.get("automated_reports.last_sent")
+            today = datetime.now()
+            
+            # Get the start of the current week (Monday)
+            start_of_week = today - timedelta(days=today.weekday())
+            current_week = start_of_week.strftime("%Y-%m-%d")
+            
+            if last_sent != current_week:
+                return True
+        
+        return False
+    
     def mark_report_sent(self):
         """Mark that the report was sent today"""
         today = datetime.now().strftime("%Y-%m-%d")
         return self.set("automated_reports.last_sent", today)
+    
+    def mark_weekly_report_sent(self):
+        """Mark that the weekly report was sent this week"""
+        today = datetime.now()
+        # Get the start of the current week (Monday)
+        start_of_week = today - timedelta(days=today.weekday())
+        current_week = start_of_week.strftime("%Y-%m-%d")
+        return self.set("automated_reports.last_sent", current_week)
     
     def get_decrypted_config(self):
         """Get configuration with decrypted passwords for use in scripts"""

@@ -32,15 +32,15 @@ const initialState = {
   // Add exchange rates for currency conversion
   exchangeRates: {
     AED: 1.0, // Base currency
-    USD: 0.272, // 1 AED = 0.272 USD
-    EUR: 0.251, // 1 AED = 0.251 EUR
-    GBP: 0.215, // 1 AED = 0.215 GBP
-    SAR: 1.02, // 1 AED = 1.02 SAR
-    KWD: 0.083, // 1 AED = 0.083 KWD
-    BHD: 0.102, // 1 AED = 0.102 BHD
-    QAR: 0.99, // 1 AED = 0.99 QAR
-    OMR: 0.105, // 1 AED = 0.105 OMR
-    JOD: 0.193, // 1 AED = 0.193 JOD
+    USD: 3.67, // 1 USD = 3.67 AED
+    EUR: 3.98, // 1 EUR = 3.98 AED
+    GBP: 4.65, // 1 GBP = 4.65 AED
+    SAR: 0.98, // 1 SAR = 0.98 AED
+    KWD: 12.05, // 1 KWD = 12.05 AED
+    BHD: 9.80, // 1 BHD = 9.80 AED
+    QAR: 1.01, // 1 QAR = 1.01 AED
+    OMR: 9.52, // 1 OMR = 9.52 AED
+    JOD: 5.18, // 1 JOD = 5.18 AED
   }
 };
 
@@ -428,38 +428,10 @@ export function AuthProvider({ children }) {
   const formatCurrencyAmount = (amount, currencyCode, originalCurrency = null) => {
     // If currencyCode is ORIGINAL, use the original currency symbol
     if (currencyCode === 'ORIGINAL' && originalCurrency) {
-      const symbols = {
-        'AED': 'د.إ',
-        'USD': '$',
-        'EUR': '€',
-        'GBP': '£',
-        'SAR': 'ر.س',
-        'KWD': 'د.ك',
-        'BHD': 'د.ب',
-        'QAR': 'ر.ق',
-        'OMR': 'ر.ع',
-        'JOD': 'د.أ'
-      };
-      
-      const symbol = symbols[originalCurrency] || originalCurrency;
-      return `${symbol}${amount.toLocaleString()}`;
+      return `${amount.toLocaleString()} ${originalCurrency}`;
     }
     
-    const symbols = {
-      'AED': 'د.إ',
-      'USD': '$',
-      'EUR': '€',
-      'GBP': '£',
-      'SAR': 'ر.س',
-      'KWD': 'د.ك',
-      'BHD': 'د.ب',
-      'QAR': 'ر.ق',
-      'OMR': 'ر.ع',
-      'JOD': 'د.أ'
-    };
-    
-    const symbol = symbols[currencyCode] || currencyCode;
-    return `${symbol}${amount.toLocaleString()}`;
+    return `${amount.toLocaleString()} ${currencyCode}`;
   };
 
   const value = {

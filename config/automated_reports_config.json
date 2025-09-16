@@ -2,9 +2,10 @@
   "automated_reports": {
     "enabled": true,
     "recipient_email": "sanad.zaqtan@prezlab.com",
-    "report_time": "23:00",
-    "check_interval": "hourly",
-    "email_template": "daily_summary",
+    "report_time": "15:01",
+    "report_day": "monday",
+    "check_interval": "weekly",
+    "email_template": "weekly_summary",
     "last_sent": null,
     "odoo_connection": {
       "database": "odoo-ps-psae-prezlab-main-10779811",
@@ -20,10 +21,51 @@
     },
     "recipients": [
       {
-        "email": "omar.elhasan@prezlab.com",
-        "name": "Omar"
+        "email": "mohammad.arabyat@prezlab.com",
+        "name": ""
+      },
+      {
+        "email": "procurement@prezlab.com",
+        "name": ""
       }
     ],
-    "cc_recipients": []
+    "cc_recipients": [
+      {
+        "email": "sanad.zaqtan@prezlab.com",
+        "name": ""
+      },
+      {
+        "email": "Omar.elhasan@prezlab.com",
+        "name": ""
+      },
+      {
+        "email": "saba.dababneh@prezlab.com",
+        "name": ""
+      },
+      {
+        "email": "ibrahim.alnabelsi@prezlab.com",
+        "name": ""
+      },
+      {
+        "email": "Zaid.Abulfealat@prezlab.com",
+        "name": ""
+      },
+      {
+        "email": "riad.abualfailat@prezlab.com",
+        "name": ""
+      },
+      {
+        "email": "Ashraf.Alkhalili@prezlab.com",
+        "name": ""
+      },
+      {
+        "email": "elissa.albardawil@prezlab.com",
+        "name": ""
+      },
+      {
+        "email": "Muneera.AlSadah@prezlab.com",
+        "name": ""
+      }
+    ]
   }
 }
