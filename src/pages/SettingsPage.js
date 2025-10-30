@@ -3,6 +3,7 @@ import Layout from '../components/Layout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { Select, SelectOption } from '../components/ui/Select';
 import Progress from '../components/ui/Progress';
 import { useAuth } from '../contexts/AuthContext';
 import { jsPDF } from 'jspdf';
@@ -1194,6 +1195,18 @@ END OF REPORT
               ) : (
                 <div className="space-y-3">
                   <div className="space-y-2">
+                    <label className="text-sm font-medium">Email Provider</label>
+                    <Select
+                      value={emailConfig.provider || 'smtp'}
+                      onChange={(e) => setEmailConfig(prev => ({ ...prev, provider: e.target.value }))}
+                    >
+                      <SelectOption value="smtp">SMTP (username & password)</SelectOption>
+                      <SelectOption value="outlook">Microsoft 365 (Azure AD)</SelectOption>
+                    </Select>
+                    <p className="text-xs text-gray-500">Switch to Microsoft 365 when Outlook/Azure AD is configured on the server.</p>
+                  </div>
+
+                  <div className="space-y-2">
                     <label className="text-sm font-medium">Sender Email</label>
                     <Input
                       value={emailConfig.senderEmail}
@@ -1203,25 +1216,26 @@ END OF REPORT
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Sender Password</label>
-                    <div className="relative">
-                      <Input
-                        type={showEmailPassword ? 'text' : 'password'}
-                        value={emailConfig.senderPassword}
-                        onChange={(e) => setEmailConfig(prev => ({ ...prev, senderPassword: e.target.value }))}
-                        placeholder="password"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowEmailPassword(!showEmailPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                      >
-                        {showEmailPassword ? '🙈' : '👁'}
-                      </button>
+                  {(emailConfig.provider || 'smtp') === 'smtp' && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Sender Password</label>
+                      <div className="relative">
+                        <Input
+                          type={showEmailPassword ? 'text' : 'password'}
+                          value={emailConfig.senderPassword}
+                          onChange={(e) => setEmailConfig(prev => ({ ...prev, senderPassword: e.target.value }))}
+                          placeholder="password"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowEmailPassword(!showEmailPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                        >
+                          {showEmailPassword ? 'dYT^' : 'dY`?'}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-
+                  )}
                   <div className="space-y-2">
                     <label className="text-sm font-medium">CC List (Optional)</label>
                     <Input
@@ -1242,7 +1256,7 @@ END OF REPORT
                   </div>
 
                   {/* Advanced Settings */}
-                  {showAdvancedEmail && (
+                  {showAdvancedEmail && (emailConfig.provider || 'smtp') === 'smtp' && (
                     <div className="space-y-3 pt-3 border-t border-gray-200">
                       <div className="space-y-2">
                         <label className="text-sm font-medium">SMTP Server</label>
@@ -1298,14 +1312,16 @@ END OF REPORT
                       size="sm"
                       onClick={async () => {
                         try {
+                      const provider = emailConfig.provider || 'smtp';
       const response = await fetch('/api/email/test', {
                             method: 'POST',
                             headers: {
                               'Content-Type': 'application/json',
                             },
                             body: JSON.stringify({
+                              provider,
                               senderEmail: emailConfig.senderEmail,
-                              senderPassword: emailConfig.senderPassword,
+                              senderPassword: provider === 'smtp' ? emailConfig.senderPassword : undefined,
                               smtpServer: emailConfig.smtpServer,
                               smtpPort: emailConfig.smtpPort,
                               testEmail: emailConfig.senderEmail // Send test to self
@@ -1322,7 +1338,7 @@ END OF REPORT
                           alert(`Test email failed: ${error.message}`);
                         }
                       }}
-                      disabled={!emailConfig.senderEmail || !emailConfig.senderPassword}
+                      disabled={!emailConfig.senderEmail || ((emailConfig.provider || 'smtp') === 'smtp' && !emailConfig.senderPassword)}
                     >
                       Test Email
                     </Button>

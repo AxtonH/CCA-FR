@@ -104,6 +104,12 @@ The backend should implement the following endpoints:
 - Manage security preferences
 - View application information
 
+#### Microsoft 365 / Outlook setup
+- Create (or reuse) an Azure AD app registration with `Mail.Send` application permission and grant admin consent.
+- Store the credentials in `.env`: `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`. For React defaults set `REACT_APP_DEFAULT_EMAIL_PROVIDER=outlook` (or toggle the provider in Settings).
+- In the app, open **Settings → Email**, pick **Microsoft 365 (Azure AD)** as the provider, and enter the sending mailbox (password is not required for Graph).
+- The backend now sends via Microsoft Graph using client credentials, so no SMTP password is transmitted. Rotate the secret regularly and keep it out of source control (`.env` is ignored by git).
+
 ## 🎨 UI Components
 
 The application uses a custom component library built with Tailwind CSS:

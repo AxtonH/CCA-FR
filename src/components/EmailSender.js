@@ -35,6 +35,7 @@ const EmailSender = () => {
     template: 'auto',
     ccList: settings.emailConfig.ccList || '',
     enablePdfAttachment: true,
+    provider: settings.emailConfig.provider || 'smtp',
   });
   const [clientThreadInfo, setClientThreadInfo] = useState({});
   const [isSending, setIsSending] = useState(false);
@@ -532,20 +533,26 @@ please dismiss this email if you have already made the payment`
         };
       });
       
+      const provider = settings.emailConfig.provider || 'smtp';
+      const globalConfigPayload = {
+        ...globalEmailConfig,
+        provider,
+        senderEmail: settings.emailConfig.senderEmail,
+        smtpServer: settings.emailConfig.smtpServer,
+        smtpPort: settings.emailConfig.smtpPort,
+      };
+      if (provider === 'smtp' && settings.emailConfig.senderPassword) {
+        globalConfigPayload.senderPassword = settings.emailConfig.senderPassword;
+      }
+
       // Debug: Log what we're sending
       console.log('🔍 Frontend: Sending email request with data:', {
         connectionId,
         selectedClients,
         emailConfigs: emailConfigsForSending,
-        globalEmailConfig: {
-          ...globalEmailConfig,
-          senderEmail: settings.emailConfig.senderEmail,
-          senderPassword: settings.emailConfig.senderPassword,
-          smtpServer: settings.emailConfig.smtpServer,
-          smtpPort: settings.emailConfig.smtpPort
-        }
+        globalEmailConfig: globalConfigPayload
       });
-      
+
       // Call the backend API to send emails
       const response = await fetch('/api/email/send', {
         method: 'POST',
@@ -556,13 +563,7 @@ please dismiss this email if you have already made the payment`
           connectionId,
           selectedClients,
           emailConfigs: emailConfigsForSending,
-          globalEmailConfig: {
-            ...globalEmailConfig,
-            senderEmail: settings.emailConfig.senderEmail,
-            senderPassword: settings.emailConfig.senderPassword,
-            smtpServer: settings.emailConfig.smtpServer,
-            smtpPort: settings.emailConfig.smtpPort
-          },
+          globalEmailConfig: globalConfigPayload,
           // Send the invoice data from the dashboard to avoid fetching from Odoo again
           invoiceData: overdueInvoices
         }),
@@ -573,6 +574,11 @@ please dismiss this email if you have already made the payment`
       }
       
       const result = await response.json();
+      console.log('Thread info response:', result);
+      if (result.success && result.thread_info) {
+        console.log('Setting client thread info:', result.thread_info);
+        setClientThreadInfo(result.thread_info);
+      }
       setSendResults(result);
       
       if (result.successfulSends > 0) {

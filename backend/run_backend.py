@@ -5,6 +5,7 @@ Backend server for Odoo Invoice Follow-Up Manager React Application
 
 import os
 import sys
+import smtplib
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from datetime import datetime
@@ -30,6 +31,7 @@ CORS(app)
 try:
     from core import OdooConnector, InvoicePDFGenerator, generate_email_template, send_email, get_automatic_iban_attachment, thread_manager
     from email_templates import get_template_by_type
+    from azure_email import send_email_via_graph
     print("Successfully imported core modules")
 except ImportError as e:
     print(f"Warning: Could not import core modules: {e}")
@@ -409,19 +411,55 @@ def send_bulk_emails():
                 cc_list = email_config.get('ccList', '').split(',') if email_config.get('ccList') else []
                 cc_list = [email.strip() for email in cc_list if email.strip()]
                 
-                # Get sender credentials from global config
+                # Determine provider and credentials
+                provider = (global_config.get('provider') or email_config.get('provider') or 'smtp').lower()
                 sender_email = global_config.get('senderEmail', email_config.get('senderEmail', 'noreply@company.com'))
                 sender_password = global_config.get('senderPassword', email_config.get('senderPassword', ''))
                 smtp_server = global_config.get('smtpServer', email_config.get('smtpServer', 'smtp.gmail.com'))
                 smtp_port = global_config.get('smtpPort', email_config.get('smtpPort', 587))
                 
-                if send_email(sender_email, sender_password, client_email, cc_list, subject, body, attachments, smtp_server, smtp_port, client_name=client_name, company_name=company_name, enable_threading=True):
+                send_success = False
+                send_error = None
+                
+                if provider in ('outlook', 'microsoft', 'azure', 'graph'):
+                    try:
+                        send_success, send_error = send_email_via_graph(
+                            sender_email=sender_email,
+                            recipient_email=client_email,
+                            subject=subject,
+                            body=body,
+                            cc_list=cc_list,
+                            attachments=attachments,
+                        )
+                    except Exception as e:
+                        send_success = False
+                        send_error = str(e)
+                else:
+                    send_success = send_email(
+                        sender_email,
+                        sender_password,
+                        client_email,
+                        cc_list,
+                        subject,
+                        body,
+                        attachments,
+                        smtp_server,
+                        smtp_port,
+                        client_name=client_name,
+                        company_name=company_name,
+                        enable_threading=True
+                    )
+                
+                if send_success:
                     successful_sends += 1
-                    print(f"✅ Email sent to {client_name}")
+                    print(f"?o. Email sent to {client_name}")
                 else:
                     failed_sends += 1
                     failed_clients.append(f"{client_name} (email failed)")
-                    print(f"❌ Failed to send email to {client_name}")
+                    if send_error:
+                        print(f"??O Failed to send email to {client_name}: {send_error}")
+                    else:
+                        print(f"??O Failed to send email to {client_name}")
                     
             except Exception as e:
                 failed_sends += 1
@@ -447,25 +485,13 @@ def test_email():
     """Test email configuration by sending a test email"""
     try:
         data = request.json
+        provider = (data.get('provider') or 'smtp').lower()
         sender_email = data.get('senderEmail')
         sender_password = data.get('senderPassword')
         smtp_server = data.get('smtpServer', 'smtp.gmail.com')
         smtp_port = data.get('smtpPort', 587)
         test_email = data.get('testEmail', sender_email)
-        
-        if not all([sender_email, sender_password, test_email]):
-            return jsonify({'error': 'Missing required email configuration'}), 400
-        
-        print(f"🧪 Testing email configuration:")
-        print(f"   Sender: {sender_email}")
-        print(f"   SMTP: {smtp_server}:{smtp_port}")
-        print(f"   Test recipient: {test_email}")
-        
-        # Send test email using simple SMTP (bypass complex send_email function)
-        import smtplib
-        from email.mime.text import MIMEText
-        
-        # Create simple text message
+
         subject = "Test Email - Odoo Invoice Follow-Up Manager"
         body = f"""Hello,
 
@@ -475,49 +501,76 @@ If you received this email, your email configuration is working correctly.
 
 Test Details:
 - Sender: {sender_email}
-- SMTP Server: {smtp_server}:{smtp_port}
+- Transport: {provider}
 - Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 Best regards,
 Odoo Invoice Follow-Up Manager"""
-        
-        # Create message
+
+        if provider in ('outlook', 'microsoft', 'azure', 'graph'):
+            if not sender_email or not test_email:
+                return jsonify({'error': 'Missing required email configuration'}), 400
+
+            print(f"dY Testing Outlook email configuration:")
+            print(f"   Sender: {sender_email}")
+            print(f"   Test recipient: {test_email}")
+
+            success, err = send_email_via_graph(
+                sender_email=sender_email,
+                recipient_email=test_email,
+                subject=subject,
+                body=body,
+                cc_list=[],
+                attachments=[],
+            )
+            if success:
+                print(f"   ®o. Test email sent successfully via Microsoft Graph!")
+                return jsonify({'success': True, 'message': 'Test email sent successfully via Microsoft Graph'})
+
+            print(f"®f?O Test email failed via Microsoft Graph: {err}")
+            return jsonify({'error': f'Test email failed via Microsoft Graph: {err}'}), 500
+
+        if not all([sender_email, sender_password, test_email]):
+            return jsonify({'error': 'Missing required email configuration'}), 400
+
+        print(f"dY Testing SMTP email configuration:")
+        print(f"   Sender: {sender_email}")
+        print(f"   SMTP: {smtp_server}:{smtp_port}")
+        print(f"   Test recipient: {test_email}")
+
+        from email.mime.text import MIMEText
+
         msg = MIMEText(body, 'plain', 'utf-8')
         msg['From'] = sender_email
         msg['To'] = test_email
         msg['Subject'] = subject
-        
-        # Send email
+
         print(f"   Connecting to SMTP server...")
         server = smtplib.SMTP(smtp_server, smtp_port)
         server.starttls()
-        
+
         print(f"   Authenticating...")
         server.login(sender_email, sender_password)
-        
+
         print(f"   Sending test email...")
         server.sendmail(sender_email, [test_email], msg.as_string())
         server.quit()
-        
-        print(f"   ✅ Test email sent successfully!")
-        return jsonify({
-            'success': True,
-            'message': 'Test email sent successfully'
-        })
-        
+
+        print(f"   ®o. Test email sent successfully!")
+        return jsonify({'success': True, 'message': 'Test email sent successfully'})
+
     except smtplib.SMTPAuthenticationError as e:
-        print(f"❌ SMTP Authentication Error: {str(e)}")
+        print(f"®f?O SMTP Authentication Error: {str(e)}")
         return jsonify({'error': f'Authentication failed: {str(e)}'}), 401
     except smtplib.SMTPRecipientsRefused as e:
-        print(f"❌ SMTP Recipients Refused: {str(e)}")
+        print(f"®f?O SMTP Recipients Refused: {str(e)}")
         return jsonify({'error': f'Invalid recipient email: {str(e)}'}), 400
     except smtplib.SMTPServerDisconnected as e:
-        print(f"❌ SMTP Server Disconnected: {str(e)}")
+        print(f"®f?O SMTP Server Disconnected: {str(e)}")
         return jsonify({'error': f'SMTP server connection failed: {str(e)}'}), 500
     except Exception as e:
-        print(f"❌ Test email error: {str(e)}")
+        print(f"®f?O Test email error: {str(e)}")
         return jsonify({'error': f'Test email failed: {str(e)}'}), 500
-
 @app.route('/api/pdf/generate', methods=['POST'])
 def generate_pdf():
     """Generate PDF for a specific client"""

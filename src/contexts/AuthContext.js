@@ -21,6 +21,7 @@ const initialState = {
         smtpServer: process.env.REACT_APP_DEFAULT_SMTP_SERVER || 'smtp.gmail.com',
         smtpPort: process.env.REACT_APP_DEFAULT_SMTP_PORT || '587',
         defaultSenderName: '',
+        provider: process.env.REACT_APP_DEFAULT_EMAIL_PROVIDER || 'smtp',
       },
     currency: 'ORIGINAL',
     security: {
